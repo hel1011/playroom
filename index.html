@@ -168,6 +168,9 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .bubble::before { content: ""; position: absolute; left: -9px; top: 50%; margin-top: -8px; border: 8px solid transparent; border-right-color: var(--card); border-left: 0; }
 
 /* ---------- Welcome ---------- */
+.tidy { position: fixed; inset: 0; z-index: 80; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; animation: t-tidyin .25s ease-out; }
+.tidy .pip { width: 120px; height: 120px; animation: breathe 1s ease-in-out infinite; } .tidy p { font: 800 22px/1.2 var(--f-display); color: var(--ink); margin: 0; }
+@keyframes t-tidyin { from { opacity: 0; } }
 .restartnote { margin: 4px 0 0; font-size: 13px; color: var(--muted); text-align: center; }
 #splash { align-items: center; justify-content: center; text-align: center; gap: 14px;
   background: radial-gradient(circle at 50% 38%, #fff 0, var(--bg) 55%); border-radius: 28px; }
@@ -1540,12 +1543,20 @@ let current = null, cleanup = null, played = 0;
 // Phones give a web page only so much memory, and Safari never fully lets go of everything a game used.
 // So after a while of play, going back to the game shelf quietly reloads the page and lands right back on the shelf
 // (stars and treehouse are saved, so nothing is lost). Clearing out like this keeps Safari from shutting the page down mid-game.
-const FRESH_GAMES = 6, FRESH_MS = 10 * 60e3, bootT = Date.now();
+const FRESH_GAMES = 15, FRESH_MS = 25 * 60e3, bootT = Date.now();
+let goingFresh = false;
 let subLabel = '';
 function freshStart() {
   if (played < FRESH_GAMES && Date.now() - bootT < FRESH_MS) return false;
-  try { sessionStorage.setItem('pr-fresh', '1'); } catch (e) { return false; }
-  $('#game').hidden = true; $('#shelf').hidden = false; location.reload(); return true;
+  // remember that this reload is on purpose (in both places, since home-screen apps can lose sessionStorage)
+  goingFresh = true;
+  try { sessionStorage.setItem('pr-fresh', '1'); } catch (e) {}
+  try { localStorage.setItem('pr-fresh-at', String(Date.now())); } catch (e) {}
+  $('#game').hidden = true; $('#shelf').hidden = false;
+  const t = document.createElement('div'); t.className = 'tidy';
+  t.innerHTML = `<svg class="pip" viewBox="0 0 100 100" aria-hidden="true">${PIP_ART}</svg><p>Tidying up the playroom…</p>`;
+  document.body.appendChild(t); Sound.stopVoice();
+  setTimeout(() => location.reload(), 900); return true;
 }
 function chips(label, options, value, onPick) {
   const wrap = document.createElement('div'); wrap.className = 'tools'; wrap.setAttribute('role', 'radiogroup'); wrap.setAttribute('aria-label', label);
@@ -5390,7 +5401,9 @@ function hideRestartNote() { const n = $('#restartNote'); if (n) n.hidden = true
 (function resume() {
   let fresh = null, hb = null;
   try { fresh = sessionStorage.getItem('pr-fresh'); sessionStorage.removeItem('pr-fresh'); } catch (e) {}
+  try { const at = +localStorage.getItem('pr-fresh-at') || 0; if (Date.now() - at < 30e3) fresh = fresh || '1'; localStorage.removeItem('pr-fresh-at'); } catch (e) {}
   try { hb = JSON.parse(localStorage.getItem(HB) || 'null'); } catch (e) {}
+  if (hb && hb.fresh && Date.now() - hb.t < 60e3) fresh = fresh || '1';
   const recent = hb && Date.now() - hb.t < 30 * 60e3 && !hb.clean && !!activePid;
   if ((fresh && activePid) || recent) { $('#splash').hidden = true; $('#shelf').hidden = false; caption(TEXT.hub); Sound.preload(['hub', 'star', ...PRAISE, ...TRY]); }
   if (!fresh && recent) {
@@ -5405,7 +5418,7 @@ function hideRestartNote() { const n = $('#restartNote'); if (n) n.hidden = true
 let closing = false;
 beat(); setInterval(() => beat(closing ? { clean: true } : null), 4000);
 document.addEventListener('visibilitychange', () => beat(closing ? { clean: true } : null));
-addEventListener('pagehide', () => { closing = !sessionStorage.getItem('pr-fresh'); beat(closing ? { clean: true } : null); });
+addEventListener('pagehide', () => { closing = !goingFresh; beat(closing ? { clean: true } : { fresh: true }); });
 addEventListener('pageshow', e => { if (e.persisted) { closing = false; beat(); } });
 if (window.speechSynthesis) speechSynthesis.getVoices();
 })();
