@@ -811,6 +811,8 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .shop-up small { font: 700 13px/1 var(--f-display); color: #b27a00; }
 .shop-up .bar { height: 12px; border-radius: 99px; background: #fff; box-shadow: inset 0 0 0 2px #ecd28a; overflow: hidden; }
 .shop-up .bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffd23f, #ff9a1f); border-radius: 99px; }
+.shop-up.door-up { background: #e9f7dd; box-shadow: 0 4px 0 #bfe2a6; } .shop-up.door-up.ready { background: #c9f0b0; }
+.shop-up.door-up .bar { box-shadow: inset 0 0 0 2px #bfe2a6; } .shop-up.door-up .bar i { background: linear-gradient(90deg, #8be08a, #3fae5a); } .shop-up.door-up small { color: #3f8a3f; }
 .tree-scene.building .tree-bg { animation: t-build 1.4s ease-in-out; }
 @keyframes t-build { 20%, 60% { transform: translateY(2px) scale(.98); filter: brightness(1.15); } 40%, 80% { transform: translateY(-2px) scale(1.01); } }
 .tree-scene.built .tree-bg { animation: t-grow .9s cubic-bezier(.3,1.5,.5,1); transform-origin: 50% 100%; }
@@ -3702,8 +3704,6 @@ function treeGame(root, api) {
   const DOORS = { out: [37.5, 54, 10, 21.3], outBig: [42, 58.7, 9, 17.3], in: [6, 30.7, 13, 40.6] };
   const doorBox = () => where === 'in' ? DOORS.in : data.big ? DOORS.outBig : DOORS.out;
   const doorCenter = () => { const d = doorBox(); return [d[0] + d[2] / 2, d[1] + d[3] / 2]; };
-  const sideBtn = document.createElement('button'); sideBtn.type = 'button'; sideBtn.className = 'chip'; tools.appendChild(sideBtn);
-  sideBtn.addEventListener('click', () => useDoor());
   door.addEventListener('click', e => { e.stopPropagation(); useDoor(); });
   const pipW = box.querySelector('#pipTree'), pipSvg = pipW.querySelector('.pip');
   pipW.addEventListener('click', () => pokePip(pipW));
@@ -3841,6 +3841,11 @@ function treeGame(root, api) {
   function head(text) { const h = document.createElement('div'); h.className = 'shop-h'; h.textContent = text; shop.appendChild(h); }
   function renderShop() {
     shop.innerHTML = '';
+    const d = document.createElement('button'); d.type = 'button'; d.className = 'shop-up door-up' + (where === 'out' && !data.inside && stars >= IN_PRICE ? ' ready' : '');
+    d.innerHTML = where === 'in' ? `<span class="up-art">🌳</span><span class="up-txt"><b>Go back outside</b><small>Tap here or the door</small></span>`
+      : data.inside ? `<span class="up-art">🚪</span><span class="up-txt"><b>Go inside the treehouse!</b><small>Tap here or the door</small></span>`
+      : `<span class="up-art">🚪</span><span class="up-txt"><b>Open the treehouse door!</b><span class="bar"><i style="width:${Math.min(100, stars / IN_PRICE * 100)}%"></i></span><small>⭐ ${Math.min(stars, IN_PRICE)} of ${IN_PRICE} saved</small></span>`;
+    d.addEventListener('click', () => { Sound.fx.tap(); useDoor(); }); shop.appendChild(d);
     if (!data.big) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'shop-up' + (stars >= BIG_PRICE ? ' ready' : '');
       b.innerHTML = `<span class="up-art">🏡</span><span class="up-txt"><b>Build a bigger treehouse!</b><span class="bar"><i style="width:${Math.min(100, stars / BIG_PRICE * 100)}%"></i></span><small>⭐ ${Math.min(stars, BIG_PRICE)} of ${BIG_PRICE} saved</small></span>`;
@@ -3907,7 +3912,6 @@ function treeGame(root, api) {
     door.classList.remove('opening'); door.classList.toggle('locked', where === 'out' && !data.inside); door.classList.toggle('exit', where === 'in');
     door.setAttribute('aria-label', where === 'in' ? 'Go back outside' : data.inside ? 'Go inside the treehouse' : `Open the treehouse door for ${IN_PRICE} stars`);
     badge.textContent = where === 'out' && !data.inside ? `🔒 ⭐${IN_PRICE}` : '';
-    sideBtn.textContent = where === 'in' ? '🌳 Go outside' : (data.inside ? '🚪 Go inside' : `🚪 Go inside (⭐${IN_PRICE})`);
     introIds = [where === 'in' ? 'th_in_hi' : 'th_intro'];
   }
   function useDoor() {
