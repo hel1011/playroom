@@ -254,6 +254,8 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
   font-size: clamp(40px, 9vw, 58px); line-height: 1;
 }
 .tile .art.tight { font-size: clamp(30px, 7vw, 44px); }
+.tile .art { overflow: hidden; } .tile .art .tart { width: 100%; height: 100%; display: block; }
+.tile:hover .tart, .tile:focus-visible .tart { animation: t-tartbob .6s ease-in-out; } @keyframes t-tartbob { 50% { transform: scale(1.06) rotate(-2deg); } }
 .tile .name { font: 800 19px/1.1 var(--f-display); text-align: center; }
 
 /* ---------- Game screen ---------- */
@@ -5169,23 +5171,107 @@ function scienceGame(root, api) {
   return () => stop();
 }
 
+/* ---- game shelf pictures: one little original illustration per game ---- */
+const TILE_ART = (() => {
+  const O = '#3a3340', S = `stroke="${O}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"`;
+  const svg = body => `<svg class="tart" viewBox="0 0 170 100" aria-hidden="true">${body}</svg>`;
+  const shine = (x, y, r) => `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${r * .6}" fill="#fff" opacity=".55" transform="rotate(-30 ${x} ${y})"/>`;
+  const card = (x, y, rot, inner, back) => `<g transform="translate(${x} ${y}) rotate(${rot})"><rect x="-22" y="-29" width="44" height="58" rx="8" fill="${back ? '#7a5cd6' : '#fff'}" ${S}/>${back
+    ? `<rect x="-16" y="-23" width="32" height="46" rx="5" fill="none" stroke="#fff" stroke-width="2" opacity=".6"/><path d="M0 -10 L3 -3 L10 -3 L4 2 L6 9 L0 5 L-6 9 L-4 2 L-10 -3 L-3 -3Z" fill="#ffd23f"/>` : inner}</g>`;
+  const dog = `<ellipse cx="-11" cy="-4" rx="6" ry="11" fill="#8a5a3a" ${S} transform="rotate(20 -11 -4)"/><ellipse cx="11" cy="-4" rx="6" ry="11" fill="#8a5a3a" ${S} transform="rotate(-20 11 -4)"/>
+    <circle cx="0" cy="2" r="13" fill="#d9a066" ${S}/><circle cx="-5" cy="-1" r="2" fill="${O}"/><circle cx="5" cy="-1" r="2" fill="${O}"/><ellipse cx="0" cy="6" rx="3.5" ry="2.6" fill="${O}"/><path d="M-3 10 Q0 12 3 10" stroke="${O}" stroke-width="1.6" fill="none"/>`;
+  const sparkle = (x, y, s = 1) => `<path transform="translate(${x} ${y}) scale(${s})" d="M0 -8 L2 -2 L8 0 L2 2 L0 8 L-2 2 L-8 0 L-2 -2Z" fill="#fff"/>`;
+  const apple = (x, y) => `<g transform="translate(${x} ${y})"><path d="M0 -10 Q-12 -16 -14 -2 Q-14 12 -4 14 Q0 12 4 14 Q14 12 14 -2 Q12 -16 0 -10Z" fill="#ff5a4e" ${S}/><path d="M0 -10 Q1 -16 4 -18" stroke="#7b522c" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M3 -15 Q10 -20 13 -14 Q7 -11 3 -15Z" fill="#5cc46a" stroke="${O}" stroke-width="2"/>${shine(-6, -3, 3)}</g>`;
+  const balloon = (x, y, c, letter) => `<g transform="translate(${x} ${y})"><path d="M0 22 Q-4 34 2 46" stroke="${O}" stroke-width="2" fill="none"/><ellipse cx="0" cy="0" rx="17" ry="21" fill="${c}" ${S}/><path d="M-3 21 L3 21 L0 25Z" fill="${c}" ${S}/>${shine(-7, -9, 4)}<text x="0" y="7" text-anchor="middle" font-family="Grandstander, Andika, sans-serif" font-weight="800" font-size="20" fill="#fff" stroke="${O}" stroke-width="1" paint-order="stroke">${letter}</text></g>`;
+  return {
+    tree: svg(`<ellipse cx="85" cy="104" rx="90" ry="16" fill="#3fa85a"/>
+      <path d="M78 100 L80 52 L92 52 L94 100Z" fill="#9a6a3c" ${S}/>
+      <g ${S}><circle cx="52" cy="30" r="22" fill="#2e9d4f"/><circle cx="118" cy="30" r="22" fill="#2e9d4f"/><circle cx="85" cy="20" r="26" fill="#3fae5a"/></g>
+      <rect x="44" y="60" width="84" height="7" rx="3" fill="#b07a46" ${S}/>
+      <rect x="54" y="34" width="44" height="27" fill="#ffd9a0" ${S}/><path d="M48 36 L76 18 L104 36Z" fill="#e8503a" ${S}/>
+      <path d="M82 61 V47 Q87 41 92 47 V61Z" fill="#8a5a3a" ${S}/><circle cx="66" cy="47" r="6" fill="#8fd3ff" ${S}/>
+      <g transform="translate(116 48)"><ellipse cx="0" cy="4" rx="8" ry="10" fill="#4cc35f" ${S}/><circle cx="0" cy="-7" r="7" fill="#4cc35f" ${S}/><circle cx="2" cy="-8" r="2.2" fill="#fff"/><circle cx="2.6" cy="-8" r="1.1" fill="${O}"/><path d="M6 -7 Q12 -5 7 -2Z" fill="#ff9a1f" stroke="${O}" stroke-width="1.6"/><path d="M-4 -13 Q-2 -19 2 -15" stroke="#ff5a4e" stroke-width="3" fill="none"/></g>
+      <g stroke="#7b522c" stroke-width="3"><line x1="66" y1="67" x2="66" y2="100"/><line x1="74" y1="67" x2="74" y2="100"/><line x1="66" y1="77" x2="74" y2="77"/><line x1="66" y1="88" x2="74" y2="88"/></g>`),
+    memory: svg(`${card(42, 52, -12, '', true)}${card(88, 50, 0, dog)}${card(132, 52, 12, dog)}${sparkle(110, 18, 1.1)}${sparkle(153, 22, .7)}`),
+    opposites: svg(`${card(52, 50, -8, `<circle r="12" fill="#ffd23f" ${S}/>${[...Array(8)].map((_, i) => { const a = i * Math.PI / 4; return `<line x1="${Math.cos(a) * 15}" y1="${Math.sin(a) * 15}" x2="${Math.cos(a) * 19}" y2="${Math.sin(a) * 19}" stroke="#ff9a1f" stroke-width="3" stroke-linecap="round"/>`; }).join('')}`)}
+      <g transform="translate(118 50) rotate(8)"><rect x="-22" y="-29" width="44" height="58" rx="8" fill="#26305e" ${S}/><circle cx="-2" cy="0" r="14" fill="#fff3b0" ${S}/><circle cx="5" cy="-5" r="12" fill="#26305e"/><circle cx="-12" cy="-16" r="1.6" fill="#fff"/><circle cx="12" cy="16" r="1.4" fill="#fff"/><circle cx="14" cy="-8" r="1.2" fill="#fff"/></g>
+      <path d="M74 50 H96 M78 44 L72 50 L78 56 M92 44 L98 50 L92 56" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`),
+    colors: svg(`${card(42, 52, -12, '', true)}${[88, 132].map((x, i) => card(x, 50 + i * 2, i * 12, `<path d="M0 -14 Q9 -16 11 -6 Q18 -2 12 6 Q12 15 2 13 Q-6 18 -11 9 Q-18 3 -11 -4 Q-11 -14 0 -14Z" fill="#ff5a4e" ${S}/>${shine(-4, -5, 3.5)}<circle cx="13" cy="-13" r="2.6" fill="#ff5a4e" stroke="${O}" stroke-width="1.6"/>`)).join('')}${sparkle(110, 18, 1.1)}<g transform="translate(152 84) rotate(-35)"><rect x="-4" y="-16" width="8" height="26" rx="2" fill="#4ab3ff" ${S}/><path d="M-4 -16 L0 -24 L4 -16Z" fill="#1e63d6" ${S}/></g>`),
+    ttt: svg(`<rect x="45" y="5" width="80" height="90" rx="12" fill="#fff" ${S}/>
+      <g stroke="${O}" stroke-width="4" stroke-linecap="round"><line x1="72" y1="14" x2="71" y2="86"/><line x1="98" y1="14" x2="99" y2="86"/><line x1="52" y1="35" x2="118" y2="36"/><line x1="52" y1="64" x2="118" y2="63"/></g>
+      <g stroke="#ff5a4e" stroke-width="6" stroke-linecap="round"><path d="M54 16 L66 29 M66 16 L54 29"/><path d="M80 43 L92 56 M92 43 L80 56"/><path d="M106 70 L118 83 M118 70 L106 83"/></g>
+      <g fill="none" stroke="#1e63d6" stroke-width="5.5"><circle cx="112" cy="22" r="7"/><circle cx="60" cy="76" r="7"/></g>
+      <line x1="52" y1="14" x2="121" y2="86" stroke="#ffd23f" stroke-width="5" stroke-linecap="round" opacity=".85"/>`),
+    trace: svg(`<rect x="34" y="6" width="84" height="88" rx="10" fill="#fff" ${S}/>
+      <path d="M50 82 L76 18 L102 82 M60 58 H92" stroke="#c4cfdb" stroke-width="11" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M50 82 L76 18 L102 82 M60 58 H92" stroke="#7a8796" stroke-width="2" stroke-dasharray="4 5" fill="none" stroke-linecap="round"/>
+      <path d="M50 82 L76 18 L92 58" stroke="#ff7440" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="50" cy="82" r="5" fill="#3fc58a" ${S}/>
+      <g transform="translate(108 46) rotate(35)"><rect x="-6" y="-34" width="12" height="40" fill="#ffd23f" ${S}/><rect x="-6" y="-40" width="12" height="8" rx="2" fill="#ff9ec4" ${S}/><path d="M-6 6 L0 18 L6 6Z" fill="#ffe0b0" ${S}/><path d="M-2 14 L0 18 L2 14Z" fill="${O}"/></g>`),
+    count: svg(`${[['#ff5a4e', 1, 30, 62], ['#4ab3ff', 2, 66, 46], ['#3fc58a', 3, 102, 30]].map(([c, n, x, y]) => `<g><rect x="${x}" y="${y}" width="34" height="${96 - y}" rx="6" fill="${c}" ${S}/><text x="${x + 17}" y="${y + 26}" text-anchor="middle" font-family="Grandstander, Andika, sans-serif" font-weight="800" font-size="24" fill="#fff" stroke="${O}" stroke-width="1.2" paint-order="stroke">${n}</text></g>`).join('')}
+      <g transform="translate(119 20)"><ellipse cx="0" cy="0" rx="12" ry="10" fill="#ff5a4e" ${S}/><path d="M0 -10 V10" stroke="${O}" stroke-width="2"/><circle cx="-6" cy="-1" r="2.4" fill="${O}"/><circle cx="6" cy="2" r="2.4" fill="${O}"/><circle cx="-4" cy="6" r="1.8" fill="${O}"/><circle cx="12" cy="-4" r="5" fill="${O}"/><circle cx="14" cy="-5" r="1.2" fill="#fff"/></g>
+      <ellipse cx="85" cy="97" rx="70" ry="4" fill="${O}" opacity=".15"/>`),
+    dots: svg(`<rect x="30" y="6" width="96" height="88" rx="10" fill="#fff" ${S}/>
+      ${(() => { const P = [[78, 16], [88, 40], [114, 42], [94, 60], [102, 86], [78, 72], [54, 86], [62, 60], [42, 42], [68, 40]].map(([x, y]) => [78 + (x - 78) * .74, 52 + (y - 52) * .74]);
+        return `<path d="M${P.slice(0, 6).map(p => p.map(v => v.toFixed(1)).join(' ')).join(' L')}" stroke="#ff7440" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` +
+          P.map(([x, y], i) => { const a = Math.atan2(y - 52, x - 78), lx = x + Math.cos(a) * 9, ly = y + Math.sin(a) * 8 + 3.5; return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.6" fill="${i < 6 ? '#ff7440' : O}"/><text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-family="Andika, sans-serif" font-weight="700" font-size="10" fill="${O}">${i + 1}</text>`; }).join(''); })()}
+      <g transform="translate(132 64) rotate(30)"><rect x="-5" y="-30" width="10" height="34" fill="#4ab3ff" ${S}/><path d="M-5 4 L0 14 L5 4Z" fill="#ffe0b0" ${S}/><path d="M-1.6 11 L0 14 L1.6 11Z" fill="${O}"/></g>`),
+    math: svg(`${apple(30, 54)}${apple(62, 54)}<path d="M86 54 H102 M94 46 V62" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M86 54 H102 M94 46 V62" stroke="${O}" stroke-width="1.5" stroke-linecap="round" opacity=".25"/>${apple(128, 54)}
+      <rect x="10" y="74" width="150" height="8" rx="4" fill="#fff" opacity=".35"/>`),
+    logic: svg(`<g transform="translate(85 52) scale(.9)">${[...Array(7)].map((_, i) => { const a = Math.PI + i * Math.PI / 6; return `<line x1="${Math.cos(a) * 34}" y1="${Math.sin(a) * 34}" x2="${Math.cos(a) * 44}" y2="${Math.sin(a) * 44}" stroke="#ffe680" stroke-width="5" stroke-linecap="round"/>`; }).join('')}
+      <path d="M-22 0 A24 24 0 1 1 22 0 Q14 12 12 22 H-12 Q-14 12 -22 0Z" fill="#ffd23f" ${S}/>${shine(-10, -10, 6)}<path d="M-6 22 V10 L0 4 L6 10 V22" stroke="#e0a800" stroke-width="2.4" fill="none"/>
+      <rect x="-13" y="22" width="26" height="8" rx="2" fill="#b8c2cc" ${S}/><rect x="-11" y="30" width="22" height="7" rx="3" fill="#8a96a3" ${S}/></g>
+      <text x="32" y="58" font-family="Grandstander, Andika, sans-serif" font-weight="800" font-size="34" fill="#fff" stroke="${O}" stroke-width="2.4" paint-order="stroke" transform="rotate(-12 32 58)">?</text>
+      <g transform="translate(140 66)"><circle r="13" fill="#fff" ${S}/><circle r="8" fill="#bfe9ff" ${S}/><line x1="9" y1="9" x2="20" y2="20" stroke="${O}" stroke-width="5" stroke-linecap="round"/></g>`),
+    rhyme: svg(`<g transform="translate(85 66) scale(.86)"><path d="M-30 -14 L-26 -36 L-12 -24Z M30 -14 L26 -36 L12 -24Z" fill="#ffb347" ${S}/><path d="M-26 -30 L-23 -22 L-16 -24Z M26 -30 L23 -22 L16 -24Z" fill="#ff9ec4"/>
+      <ellipse cx="0" cy="0" rx="32" ry="28" fill="#ffb347" ${S}/><ellipse cx="-11" cy="-2" rx="4" ry="5.5" fill="${O}"/><ellipse cx="11" cy="-2" rx="4" ry="5.5" fill="${O}"/><circle cx="-10" cy="-4" r="1.5" fill="#fff"/><circle cx="12" cy="-4" r="1.5" fill="#fff"/>
+      <path d="M-4 7 L4 7 L0 11Z" fill="#ff7a8a" stroke="${O}" stroke-width="1.6"/><path d="M0 11 Q-5 17 -10 14 M0 11 Q5 17 10 14" stroke="${O}" stroke-width="2" fill="none"/>
+      <g stroke="${O}" stroke-width="1.6"><line x1="-16" y1="9" x2="-36" y2="6"/><line x1="-16" y1="13" x2="-35" y2="16"/><line x1="16" y1="9" x2="36" y2="6"/><line x1="16" y1="13" x2="35" y2="16"/></g>
+      <g transform="translate(0 -30) rotate(-8)"><rect x="-26" y="-4" width="52" height="8" rx="3" fill="#3a3340"/><rect x="-16" y="-34" width="32" height="32" rx="3" fill="#3a3340"/><rect x="-16" y="-12" width="32" height="7" fill="#ff5a4e"/></g></g>
+      <g fill="#fff" stroke="${O}" stroke-width="1.6"><path d="M22 30 V12 L34 9 V26"/><ellipse cx="19" cy="31" rx="4.6" ry="3.6"/><ellipse cx="31" cy="27" rx="4.6" ry="3.6"/><path d="M140 26 V10"/><ellipse cx="137" cy="27" rx="4.6" ry="3.6"/><path d="M140 10 Q148 12 150 18" fill="none"/></g>`),
+    science: svg(`<path d="M70 10 H96 M74 10 V36 L50 84 Q46 94 58 94 H108 Q120 94 116 84 L92 36 V10" fill="#fff" fill-opacity=".9" ${S}/>
+      <path d="M62 62 H104 L116 84 Q120 94 108 94 H58 Q46 94 50 84Z" fill="#6cdc7c" ${S}/>${shine(68, 76, 5)}
+      <g fill="#fff" stroke="${O}" stroke-width="1.6"><circle cx="80" cy="74" r="4"/><circle cx="92" cy="82" r="3"/><circle cx="86" cy="50" r="3.6"/><circle cx="80" cy="30" r="3"/><circle cx="90" cy="16" r="2.4"/></g>
+      <g transform="translate(140 42)" fill="none" stroke="#fff" stroke-width="3"><ellipse rx="20" ry="8"/><ellipse rx="20" ry="8" transform="rotate(60)"/><ellipse rx="20" ry="8" transform="rotate(-60)"/></g><circle cx="140" cy="42" r="5" fill="#ffd23f" ${S}/>
+      <g transform="translate(28 50) rotate(-14)"><rect x="-7" y="-24" width="14" height="44" rx="7" fill="#fff" ${S}/><path d="M-7 2 H7 V13 A7 7 0 0 1 -7 13Z" fill="#ff7ad1"/><rect x="-7" y="-24" width="14" height="44" rx="7" fill="none" ${S}/></g>`),
+    story: svg(`<g transform="translate(85 64) scale(.9)"><path d="M-14 -22 Q-20 -48 -10 -50 Q-2 -46 -6 -22Z M6 -22 Q2 -46 10 -50 Q20 -48 14 -22Z" fill="#fff" ${S}/><path d="M-11 -26 Q-14 -42 -10 -44 Q-6 -40 -8 -26Z M8 -26 Q6 -40 10 -44 Q14 -42 11 -26Z" fill="#ffb3c7"/>
+      <circle cx="0" cy="-16" r="15" fill="#fff" ${S}/><circle cx="-5" cy="-18" r="2" fill="${O}"/><circle cx="5" cy="-18" r="2" fill="${O}"/><ellipse cx="0" cy="-12" rx="2.6" ry="1.8" fill="#ff7a8a"/>
+      <path d="M0 -2 Q-28 -12 -62 -6 V30 Q-28 24 0 32 Q28 24 62 30 V-6 Q28 -12 0 -2Z" fill="#fff" ${S}/><path d="M0 -2 V32" stroke="${O}" stroke-width="3"/>
+      <g stroke="#c4cfdb" stroke-width="2.4" stroke-linecap="round"><line x1="-52" y1="4" x2="-12" y2="6"/><line x1="-52" y1="12" x2="-12" y2="14"/><line x1="-52" y1="20" x2="-22" y2="21"/><line x1="12" y1="6" x2="52" y2="4"/><line x1="12" y1="14" x2="52" y2="12"/><line x1="12" y1="21" x2="40" y2="20"/></g>
+      <path d="M-62 30 Q-28 24 0 32 Q28 24 62 30 V36 Q28 30 0 38 Q-28 30 -62 36Z" fill="#ffd23f" ${S}/></g>
+      ${sparkle(34, 22, .9)}${sparkle(138, 16, 1.1)}${sparkle(126, 40, .6)}`),
+    pop: svg(`${balloon(42, 38, '#ff5a4e', 'A')}${balloon(84, 30, '#ffd23f', 'B')}${balloon(124, 40, '#4ab3ff', 'C')}
+      <g transform="translate(152 74)"><path d="M0 -14 L4 -5 L14 -6 L7 1 L12 10 L2 6 L-4 14 L-4 4 L-14 2 L-6 -3Z" fill="#fff" ${S}/></g>`),
+    puzzle: svg(`<defs><clipPath id="tpz"><rect x="30" y="10" width="96" height="80" rx="8"/></clipPath></defs>
+      <g clip-path="url(#tpz)"><rect x="30" y="10" width="96" height="80" fill="#8fd3ff"/><circle cx="104" cy="30" r="11" fill="#ffd23f"/><path d="M30 70 Q60 50 88 64 Q108 54 126 62 V90 H30Z" fill="#5cc46a"/><path d="M30 80 Q70 70 126 80 V90 H30Z" fill="#3fae5a"/><ellipse cx="56" cy="28" rx="13" ry="5" fill="#fff"/></g>
+      <path d="M30 50 H48 Q46 44 52 44 Q58 44 56 50 H78 V30 Q72 32 72 26 Q72 20 78 22 V10 M78 50 V68 Q72 66 72 72 Q72 78 78 76 V90 M78 50 H98 Q96 56 102 56 Q108 56 106 50 H126" stroke="${O}" stroke-width="2.4" fill="none" opacity=".5"/>
+      <path d="M78 10 H126 V50 H106 Q108 56 102 56 Q96 56 98 50 H78 V30 Q72 32 72 26 Q72 20 78 22Z" fill="#6b5bb8" opacity=".35"/>
+      <rect x="30" y="10" width="96" height="80" rx="8" fill="none" ${S}/>
+      <g transform="translate(118 2) rotate(14)"><path d="M0 8 H48 V48 H28 Q30 54 24 54 Q18 54 20 48 H0 V28 Q-6 30 -6 24 Q-6 18 0 20Z" fill="#8fd3ff" ${S}/><circle cx="26" cy="22" r="10" fill="#ffd23f" stroke="${O}" stroke-width="2"/></g>`),
+    paint: svg(`<path d="M30 52 Q24 18 70 14 Q118 10 126 40 Q132 62 108 62 Q94 62 96 74 Q98 92 66 90 Q34 88 30 52Z" fill="#ffe2b0" ${S}/>
+      <ellipse cx="96" cy="72" rx="8" ry="6" fill="#ff9f5a" ${S}/>
+      ${[['#ff5a4e', 48, 40], ['#ffd23f', 64, 28], ['#4ab3ff', 84, 26], ['#3fc58a', 104, 36], ['#b27cff', 52, 64], ['#ff9ec4', 70, 74]].map(([c, x, y]) => `<circle cx="${x}" cy="${y}" r="7.5" fill="${c}" ${S}/>`).join('')}
+      <g transform="translate(132 56) rotate(38)"><rect x="-4" y="-6" width="8" height="46" rx="4" fill="#c0623a" ${S}/><rect x="-6" y="-14" width="12" height="10" fill="#c4cfdb" ${S}/><path d="M-6 -14 Q-7 -30 0 -36 Q7 -30 6 -14Z" fill="#ff5a4e" ${S}/></g>`),
+  };
+})();
+
 const GAMES = [
-  { id: 'tree', spend: true, name: "Pip's Treehouse", art: '🏡🦜', bg: '#4cbf6b', tight: true, start: treeGame, clips: () => ['th_intro', 'th_back', 'th_big_ok', 'th_in_back', 'th_out', 'th_in_need'] },
-  { id: 'memory', name: 'Animal Memory', art: '🐶🐱', bg: 'var(--t2)', tight: true, start: memoryGame('animals'), clips: () => ['mem_intro', 'nomatch', ...ANIMALS.map(a => 'an_' + a[0]), ...PRAISE] },
-  { id: 'opposites', name: 'Opposites', art: '🔥❄️', bg: 'var(--t1)', tight: true, start: memoryGame('opposites'), clips: () => ['opp_intro', 'nomatch', ...OPP.flatMap(o => ['w_' + o[0], 'w_' + o[2], 'opp_' + o[0]])] },
-  { id: 'colors', name: 'Color Match', art: '🎨', bg: 'var(--t3)', start: memoryGame('colors'), clips: () => ['col_intro', 'nomatch', ...COLORS.flatMap(c => ['c_' + c[0], 'co_' + c[0], 'cm_' + c[0]])] },
-  { id: 'ttt', name: 'Tic-Tac-Toe', art: '❌⭕', bg: 'var(--t4)', tight: true, start: tttGame, clips: () => ['ttt_intro', 'ttt_intro2', 'ttt_your', 'ttt_win', 'ttt_lose', 'ttt_tie', 'ttt_x', 'ttt_o', 'ttt_xwin', 'ttt_owin'] },
-  { id: 'trace', name: 'Trace It', art: '✏️', bg: 'var(--t5)', start: traceGame, clips: () => ['tr_intro', 'tr_keep', 'tr_dot', 'tr_A', 'trn_1', ...PRAISE] },
-  { id: 'count', name: 'Count With Me', art: '🐞', bg: 'var(--t6)', start: countGame, clips: () => ['cnt_intro', 'cnt_q', ...[...Array(10)].flatMap((_, i) => ['n_' + (i + 1), 'cnt_' + (i + 1)]), ...TRY] },
-  { id: 'dots', name: 'Dot-to-Dot', art: '✏️⭐', bg: '#ff8f5a', tight: true, start: dotsGame, clips: () => ['dt_intro', 'dt_go', 'n_1'] },
-  { id: 'math', name: 'Add & Take Away', art: '➕➖', bg: '#6c8cff', tight: true, start: mathGame, clips: () => ['math_intro', 'math_tap', ...[...Array(10)].map((_, i) => 'n_' + (i + 1)), ...TRY] },
-  { id: 'logic', name: 'Think It Through', art: '🤔💡', bg: '#4fb8a8', tight: true, start: logicGame, clips: () => ['lq_intro', 'lq_det_intro', 'lq_mach_intro', 'lq_sort_intro', 'lq_mit_intro', 'lq_det_more', 'lq_det_hint', 'lq_det_found', 'lq_mach_q', 'lq_mach_ok', 'lq_mach_no', 'lq_sort_done', 'lq_mit_no'] },
-  { id: 'rhyme', name: 'Rhyme Time', art: '🐱🎩', bg: '#9b7cff', tight: true, start: rhymeGame, clips: () => ['rh_intro', 'rw_cat'] },
-  { id: 'science', name: 'Science Lab', art: '🔬🌋', bg: '#3fa9f5', tight: true, start: scienceGame, clips: () => ['sc_pick', 'sc_great'] },
-  { id: 'story', name: 'Story Time', art: '📖🐰', bg: '#e76f8f', tight: true, start: storyGame, clips: () => ['bk_pick', 'bk_qtime', 'bk_again', 'bk_end', 'bk_think', 'bk_one_more', 'bk_again2'] },
-  { id: 'pop', name: 'Balloon Pop', art: '🎈', bg: 'var(--t7)', start: popGame, clips: () => ['pop_intro', 'try0', ...PRAISE] },
-  { id: 'puzzle', name: 'Photo Puzzle', art: '🧩', bg: 'var(--t8)', start: puzzleGame, clips: () => ['puz_intro', ...PRAISE] },
-  { id: 'paint', name: 'Paint', art: '🖍️', bg: 'var(--t9)', start: paintGame, clips: () => ['paint_intro', 'paint_fill', 'paint_brush', 'paint_erase', 'paint_done', ...PAINTS.map(p => 'c_' + p[0]), ...ART.ids.map(i => 'pt_' + i)] },
+  { id: 'tree', spend: true, name: "Pip's Treehouse", art: TILE_ART.tree, bg: '#4cbf6b', tight: true, start: treeGame, clips: () => ['th_intro', 'th_back', 'th_big_ok', 'th_in_back', 'th_out', 'th_in_need'] },
+  { id: 'memory', name: 'Animal Memory Match', art: TILE_ART.memory, bg: 'var(--t2)', tight: true, start: memoryGame('animals'), clips: () => ['mem_intro', 'nomatch', ...ANIMALS.map(a => 'an_' + a[0]), ...PRAISE] },
+  { id: 'opposites', name: 'Opposites Memory Match', art: TILE_ART.opposites, bg: 'var(--t1)', tight: true, start: memoryGame('opposites'), clips: () => ['opp_intro', 'nomatch', ...OPP.flatMap(o => ['w_' + o[0], 'w_' + o[2], 'opp_' + o[0]])] },
+  { id: 'colors', name: 'Color Memory Match', art: TILE_ART.colors, bg: 'var(--t3)', start: memoryGame('colors'), clips: () => ['col_intro', 'nomatch', ...COLORS.flatMap(c => ['c_' + c[0], 'co_' + c[0], 'cm_' + c[0]])] },
+  { id: 'ttt', name: 'Tic-Tac-Toe', art: TILE_ART.ttt, bg: 'var(--t4)', tight: true, start: tttGame, clips: () => ['ttt_intro', 'ttt_intro2', 'ttt_your', 'ttt_win', 'ttt_lose', 'ttt_tie', 'ttt_x', 'ttt_o', 'ttt_xwin', 'ttt_owin'] },
+  { id: 'trace', name: 'Trace It', art: TILE_ART.trace, bg: 'var(--t5)', start: traceGame, clips: () => ['tr_intro', 'tr_keep', 'tr_dot', 'tr_A', 'trn_1', ...PRAISE] },
+  { id: 'count', name: 'Count With Me', art: TILE_ART.count, bg: 'var(--t6)', start: countGame, clips: () => ['cnt_intro', 'cnt_q', ...[...Array(10)].flatMap((_, i) => ['n_' + (i + 1), 'cnt_' + (i + 1)]), ...TRY] },
+  { id: 'dots', name: 'Dot-to-Dot', art: TILE_ART.dots, bg: '#ff8f5a', tight: true, start: dotsGame, clips: () => ['dt_intro', 'dt_go', 'n_1'] },
+  { id: 'math', name: 'Add & Take Away', art: TILE_ART.math, bg: '#6c8cff', tight: true, start: mathGame, clips: () => ['math_intro', 'math_tap', ...[...Array(10)].map((_, i) => 'n_' + (i + 1)), ...TRY] },
+  { id: 'logic', name: 'Think It Through', art: TILE_ART.logic, bg: '#4fb8a8', tight: true, start: logicGame, clips: () => ['lq_intro', 'lq_det_intro', 'lq_mach_intro', 'lq_sort_intro', 'lq_mit_intro', 'lq_det_more', 'lq_det_hint', 'lq_det_found', 'lq_mach_q', 'lq_mach_ok', 'lq_mach_no', 'lq_sort_done', 'lq_mit_no'] },
+  { id: 'rhyme', name: 'Rhyme Time', art: TILE_ART.rhyme, bg: '#9b7cff', tight: true, start: rhymeGame, clips: () => ['rh_intro', 'rw_cat'] },
+  { id: 'science', name: 'Science Lab', art: TILE_ART.science, bg: '#3fa9f5', tight: true, start: scienceGame, clips: () => ['sc_pick', 'sc_great'] },
+  { id: 'story', name: 'Story Time', art: TILE_ART.story, bg: '#e76f8f', tight: true, start: storyGame, clips: () => ['bk_pick', 'bk_qtime', 'bk_again', 'bk_end', 'bk_think', 'bk_one_more', 'bk_again2'] },
+  { id: 'pop', name: 'Balloon Pop', art: TILE_ART.pop, bg: 'var(--t7)', start: popGame, clips: () => ['pop_intro', 'try0', ...PRAISE] },
+  { id: 'puzzle', name: 'Photo Puzzle', art: TILE_ART.puzzle, bg: 'var(--t8)', start: puzzleGame, clips: () => ['puz_intro', ...PRAISE] },
+  { id: 'paint', name: 'Paint', art: TILE_ART.paint, bg: 'var(--t9)', start: paintGame, clips: () => ['paint_intro', 'paint_fill', 'paint_brush', 'paint_erase', 'paint_done', ...PAINTS.map(p => 'c_' + p[0]), ...ART.ids.map(i => 'pt_' + i)] },
 ];
 const tilesEl = $('#tiles');
 GAMES.forEach(g => {
