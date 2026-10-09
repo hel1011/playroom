@@ -168,6 +168,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .bubble::before { content: ""; position: absolute; left: -9px; top: 50%; margin-top: -8px; border: 8px solid transparent; border-right-color: var(--card); border-left: 0; }
 
 /* ---------- Welcome ---------- */
+.restartnote { margin: 4px 0 0; font-size: 13px; color: var(--muted); text-align: center; }
 #splash { align-items: center; justify-content: center; text-align: center; gap: 14px;
   background: radial-gradient(circle at 50% 38%, #fff 0, var(--bg) 55%); border-radius: 28px; }
 #splash h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(34px, 7vw, 60px); line-height: 1; margin: 0; text-wrap: balance; }
@@ -1048,6 +1049,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
       <button class="pipwrap" id="pipHome" type="button" aria-label="Say hi to Pip"><svg class="pip" viewBox="0 0 100 100" aria-hidden="true"></svg><span class="perch"></span></button>
       <div class="bubble caption" aria-live="polite">Pick a game to start!</div>
     </div>
+    <p class="restartnote" id="restartNote" hidden></p>
     <div class="tiles" id="tiles"></div>
   </section>
 
@@ -1421,7 +1423,7 @@ function confetti() {
   const t0 = performance.now(); cancelAnimationFrame(confRAF);
   (function f(t) { g.clearRect(0, 0, W, H);
     P.forEach(p => { p.vy += .38; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.a += p.va; g.save(); g.translate(p.x, p.y); g.rotate(p.a); g.fillStyle = p.c; g.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); g.restore(); });
-    if (t - t0 < 3400) confRAF = requestAnimationFrame(f); else g.clearRect(0, 0, W, H); })(t0);
+    if (t - t0 < 3400) confRAF = requestAnimationFrame(f); else { confettiCv.width = confettiCv.height = 0; } })(t0);
 }
 function celebrate() {
   stars++; store.set('pr-stars', stars); showStars();
@@ -1435,7 +1437,17 @@ $('#celSpend').addEventListener('click', () => { $('#celebrate').hidden = true; 
 
 /* =================== Game shell =================== */
 const groot = $('#groot'), tools = $('#tools');
-let current = null, cleanup = null;
+let current = null, cleanup = null, played = 0;
+// Phones give a web page only so much memory, and Safari never fully lets go of everything a game used.
+// So after a while of play, going back to the game shelf quietly reloads the page and lands right back on the shelf
+// (stars and treehouse are saved, so nothing is lost). Clearing out like this keeps Safari from shutting the page down mid-game.
+const FRESH_GAMES = 6, FRESH_MS = 10 * 60e3, bootT = Date.now();
+let subLabel = '';
+function freshStart() {
+  if (played < FRESH_GAMES && Date.now() - bootT < FRESH_MS) return false;
+  try { sessionStorage.setItem('pr-fresh', '1'); } catch (e) { return false; }
+  $('#game').hidden = true; $('#shelf').hidden = false; location.reload(); return true;
+}
 function chips(label, options, value, onPick) {
   const wrap = document.createElement('div'); wrap.className = 'tools'; wrap.setAttribute('role', 'radiogroup'); wrap.setAttribute('aria-label', label);
   options.forEach(([val, text]) => {
@@ -1450,8 +1462,16 @@ function dotsEl(n) { const d = document.createElement('span'); d.className = 'do
 function onResize(el, fn) { let raf = 0; const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fn); }); ro.observe(el); return () => ro.disconnect(); }
 
 let introIds = [];
-function openGame(id) {
+// Safari keeps a canvas's pixels in memory until it notices the canvas is gone, which can take a long time.
+// Shrinking every canvas to nothing hands that memory back right away.
+function freeCanvas(c) { try { c.width = c.height = 0; } catch (e) {} }
+function freeGame() {
   if (cleanup) { try { cleanup(); } catch (e) {} cleanup = null; }
+  groot.querySelectorAll('canvas').forEach(freeCanvas); tools.querySelectorAll('canvas').forEach(freeCanvas);
+  groot.innerHTML = ''; tools.innerHTML = '';
+}
+function openGame(id) {
+  freeGame(); played++; subLabel = ''; hideRestartNote();
   Sound.stopVoice();
   const g = GAMES.find(x => x.id === id); current = g;
   $('#splash').hidden = true; $('#shelf').hidden = true; $('#game').hidden = false;
@@ -1464,7 +1484,8 @@ function openGame(id) {
   cleanup = g.start(groot, api) || null;
 }
 function goShelf(talk) {
-  if (cleanup) { try { cleanup(); } catch (e) {} cleanup = null; }
+  freeGame(); subLabel = '';
+  if (freshStart()) return;
   current = null; $('#game').hidden = true; $('#splash').hidden = true; $('#shelf').hidden = false;
   if (talk) Sound.say('hub'); else caption(TEXT.hub);
 }
@@ -1807,6 +1828,7 @@ function traceGame(root, api) {
     paths.forEach(pts => { tg.beginPath(); pts.forEach((p, i) => { const [x, y] = toPx(p).map(v => v / S * N); i ? tg.lineTo(x, y) : tg.moveTo(x, y); }); if (pts.length < 3) { const [x, y] = toPx(pts[0]).map(v => v / S * N); tg.lineTo(x + .1, y); } tg.stroke(); });
     const td = tg.getImageData(0, 0, N, N).data; let inTrack = 0, outside = 0;
     for (let i = 0; i < N * N; i++) { if (td[i * 4 + 3] > 60) inTrack++; else if (d[i * 4 + 3] > 60) outside++; }
+    freeCanvas(c); freeCanvas(t);
     return { cov, out: outside / Math.max(1, inTrack) };
   }
   function progress() {
@@ -2560,6 +2582,7 @@ function storyGame(root, api) {
     introIds = ['bk_pick']; if (talk) Sound.say('bk_pick');
   }
   async function open(b) {
+    subLabel = b.title;
     book = b; pi = -1; shelfBtn.hidden = false; rtm.hidden = false; wrongOnce = false;
     Sound.preload([b.id + '_title']);
     box.innerHTML = `<div class="titlepage">${art(b.cover)}<h2>${b.title}</h2><button class="big-btn" type="button">Start reading ▶</button></div>`;
@@ -2722,7 +2745,7 @@ function farmArt() {
     g.strokeStyle = '#2f8f3a'; g.lineWidth = 6; g.beginPath(); g.moveTo(x, y + 40); g.lineTo(x, y); g.stroke();
     g.fillStyle = col; for (let i = 0; i < 5; i++) { const a = i * 1.2566; g.beginPath(); g.arc(x + Math.cos(a) * 18, y + Math.sin(a) * 18, 14, 0, 7); g.fill(); }
     g.fillStyle = '#ffb703'; g.beginPath(); g.arc(x, y, 10, 0, 7); g.fill(); });
-  return c.toDataURL('image/jpeg', .9);
+  const url = c.toDataURL('image/jpeg', .9); freeCanvas(c); return url;
 }
 function seaArt() {
   const W = 1200, H = 900, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
@@ -2741,7 +2764,7 @@ function seaArt() {
     g.strokeStyle = '#1e2a33'; g.lineWidth = 5; g.lineCap = 'round'; g.beginPath(); g.arc(80, 18, 14, .1 * Math.PI, .7 * Math.PI); g.stroke(); g.restore(); }
   fish(380, 330, 1.25, '#ff9a1f', '#ff6a00', false); fish(850, 520, 1, '#ffd93d', '#f2a900', true); fish(880, 200, .7, '#b48bff', '#8a5cf0', true);
   g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 5; [[560, 260, 18], [590, 200, 12], [575, 150, 8], [1010, 420, 16], [1040, 360, 10], [200, 520, 14], [220, 470, 9]].forEach(([x, y, r]) => { g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke(); });
-  return c.toDataURL('image/jpeg', .9);
+  const url = c.toDataURL('image/jpeg', .9); freeCanvas(c); return url;
 }
 let PICS = null;
 const PSTORE = 'jigsaw-photos-v1';
@@ -2758,7 +2781,7 @@ function prepPhoto(file) {
     r.onload = () => { const img = new Image();
       img.onload = () => { let sw = img.width, sh = img.height; const a = sw / sh; if (a > 4 / 3) sw = sh * 4 / 3; else if (a < 3 / 4) sh = sw * 4 / 3;
         const k = 1000 / Math.max(sw, sh), c = document.createElement('canvas'); c.width = Math.round(sw * k); c.height = Math.round(sh * k);
-        c.getContext('2d').drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, c.width, c.height); res(c.toDataURL('image/jpeg', .82)); };
+        c.getContext('2d').drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, c.width, c.height); const url = c.toDataURL('image/jpeg', .82); freeCanvas(c); res(url); };
       img.onerror = () => res(null); img.src = r.result; };
     r.onerror = () => res(null); r.readAsDataURL(file); });
 }
@@ -2831,7 +2854,7 @@ function puzzleGame(root, api) {
     cw = W / cols; ch = H / rows; S = Math.min(cw, ch); M = S * .3;
     const hE = [], vE = [], rs = () => (Math.random() < .5 ? 1 : -1);
     for (let r = 0; r < rows; r++) { hE.push([]); vE.push([]); for (let c = 0; c < cols; c++) { hE[r].push(rs()); vE[r].push(rs()); } }
-    stage.querySelectorAll('.piece').forEach(e => e.remove()); pieces = [];
+    stage.querySelectorAll('.piece').forEach(e => { freeCanvas(e); e.remove(); }); pieces = [];
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       const cv = document.createElement('canvas'); cv.className = 'piece'; stage.appendChild(cv);
       pieces.push({ c, r, el: cv, ctx: cv.getContext('2d', { willReadFrequently: true }), top: r === 0 ? 0 : -hE[r - 1][c], bottom: r === rows - 1 ? 0 : hE[r][c],
@@ -3060,7 +3083,7 @@ function paintGame(root, api) {
   const picker = document.createElement('div'); picker.className = 'pics'; picker.setAttribute('role', 'radiogroup'); picker.setAttribute('aria-label', 'Pictures to paint'); tools.appendChild(picker);
   ART.ids.forEach(id => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'pic'; b.setAttribute('role', 'radio'); b.dataset.id = id; b.setAttribute('aria-label', id);
-    b.style.backgroundImage = `url(${ART.render(id, 150, 120).toDataURL()})`; b.style.backgroundColor = '#fff';
+    const thumb = ART.render(id, 150, 120); b.style.backgroundImage = `url(${thumb.toDataURL()})`; freeCanvas(thumb); b.style.backgroundColor = '#fff';
     b.addEventListener('click', () => { if (id !== page) { Sound.fx.tap(); save(true); open(id, true); } });
     picker.appendChild(b);
   });
@@ -3103,7 +3126,7 @@ function paintGame(root, api) {
   function open(id, talk) {
     page = id; store.set('pr-paint-page', id); undo = [];
     const art = ART.render(id, IW, IH);
-    lg.clearRect(0, 0, IW, IH); lg.drawImage(art, 0, 0);
+    lg.clearRect(0, 0, IW, IH); lg.drawImage(art, 0, 0); freeCanvas(art);
     const d = lg.getImageData(0, 0, IW, IH).data; barrier = new Uint8Array(IW * IH);
     for (let i = 0; i < IW * IH; i++) barrier[i] = d[i * 4 + 3] > 90 ? 1 : 0;
     cg.fillStyle = '#fff'; cg.fillRect(0, 0, IW, IH);
@@ -3184,7 +3207,7 @@ function paintGame(root, api) {
   api.intro(['paint_intro', 'pt_' + page]);
   requestAnimationFrame(size);
   const off = onResize(root, size);
-  return () => { off(); save(true); };
+  return () => { off(); save(true); undo = []; barrier = null; };
 }
 
 /* =================== Game list + shelf =================== */
@@ -4848,7 +4871,7 @@ function scienceGame(root, api) {
     introIds = ['sc_pick']; if (talk) Sound.say('sc_pick');
   }
   function open(t) {
-    stop(); backBtn.hidden = false; const my = tok;
+    stop(); backBtn.hidden = false; const my = tok; subLabel = t.name;
     box.innerHTML = `<div class="sci-wrap"><div class="sci-stage sci-${t.id}"><svg class="sci-svg" viewBox="0 0 400 300"></svg><svg class="sci-hand" viewBox="0 0 400 300"><text class="hand" x="0" y="0">👆</text></svg></div></div>`;
     const stage = box.querySelector('.sci-stage'), svg = stage.querySelector('.sci-svg'), handT = stage.querySelector('.hand');
     const alive = () => my === tok && box.isConnected;
@@ -4933,6 +4956,32 @@ $('#goBtn').addEventListener('click', () => {
 applyWear();
 Sound.preload(['welcome', ...PIP_LINES, 'pip_spin', 'pip_fly', 'pip_dance']);
 { const sp = $('#pipSplash .pip'); sp.classList.add('flyin'); setTimeout(() => sp.classList.remove('flyin'), 1600); }
+// after a quiet fresh start (see freshStart), go straight back to the game shelf
+// A heartbeat notes where the app is every few seconds. If the page starts again soon after (because Safari reloaded it),
+// skip the welcome screen and go straight back to the game shelf, and leave a small note saying what happened.
+const HB = 'pr-hb';
+function beat(extra) {
+  try { localStorage.setItem(HB, JSON.stringify(Object.assign({ t: Date.now(), g: current ? current.name : '', s: subLabel, v: document.visibilityState,
+    p: played, b: bootT }, extra || {}))); } catch (e) {}
+}
+function hideRestartNote() { const n = $('#restartNote'); if (n) n.hidden = true; }
+(function resume() {
+  let fresh = null, hb = null;
+  try { fresh = sessionStorage.getItem('pr-fresh'); sessionStorage.removeItem('pr-fresh'); } catch (e) {}
+  try { hb = JSON.parse(localStorage.getItem(HB) || 'null'); } catch (e) {}
+  const recent = hb && Date.now() - hb.t < 30 * 60e3;
+  if (fresh || recent) { $('#splash').hidden = true; $('#shelf').hidden = false; caption(TEXT.hub); Sound.preload(['hub', 'star', ...PRAISE, ...TRY]); }
+  if (!fresh && recent && !hb.clean) {
+    const where = [hb.g, hb.s].filter(Boolean).join(' › ') || 'the game shelf', mins = Math.max(1, Math.round((hb.t - hb.b) / 60e3));
+    const how = hb.v === 'hidden' ? 'while the app was in the background' : 'during play';
+    const note = `The page restarted ${how} (in ${where}, after about ${mins} min).`;
+    const n = $('#restartNote'); n.textContent = note; n.hidden = false;
+    try { const log = JSON.parse(localStorage.getItem('pr-restarts') || '[]'); log.push(new Date().toLocaleString() + ': ' + note); localStorage.setItem('pr-restarts', JSON.stringify(log.slice(-10))); } catch (e) {}
+  }
+})();
+beat(); setInterval(() => beat(), 4000);
+document.addEventListener('visibilitychange', () => beat());
+addEventListener('pagehide', () => beat({ clean: !sessionStorage.getItem('pr-fresh') }));
 if (window.speechSynthesis) speechSynthesis.getVoices();
 })();
 </script>
