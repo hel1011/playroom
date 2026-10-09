@@ -1226,7 +1226,7 @@ const store = {
 /* =================== Sound + voice =================== */
 const Sound = (() => {
   let ctx = null, vGain, sGain, cur = null, token = 0, noiseBuf = null, an = null, anBuf = null, lipOn = false, lipRAF = 0, lvl = 0;
-  let voiceOn = store.get('pr-voice', true), sfxOn = store.get('pr-sfx', true);
+  let voiceOn = store.get('pr-voice', true), sfxOn = store.get('pr-sfx', true), spokenN = 0;
   function ac() {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
@@ -1342,8 +1342,8 @@ const Sound = (() => {
     an.getByteTimeDomainData(anBuf); let s = 0; for (let i = 0; i < anBuf.length; i++) { const v = (anBuf[i] - 128) / 128; s += v * v; }
     const target = lipOn ? Math.min(1, Math.sqrt(s / anBuf.length) * 6) : 0;
     lvl += (target - lvl) * (target > lvl ? .7 : .3);
-    rootEl.style.setProperty('--talk', lvl.toFixed(3));
-    if (lipOn || lvl > .01) lipRAF = requestAnimationFrame(lipLoop); else rootEl.style.setProperty('--talk', '0');
+    const v = lvl.toFixed(3); document.querySelectorAll('.talkzone .pip').forEach(p => p.style.setProperty('--talk', v));
+    if (lipOn || lvl > .01) lipRAF = requestAnimationFrame(lipLoop); else document.querySelectorAll('.talkzone .pip').forEach(p => p.style.setProperty('--talk', '0'));
   }
   // say('id') or say(['id1','id2']) — plays in order, interrupting anything already speaking.
   async function say(ids, opts = {}) {
@@ -1360,7 +1360,7 @@ const Sound = (() => {
       if (!clip) { if (api.onStart) api.onStart(id, Math.max(1.5, (TEXT[id] || '').length * .07)); await speakFallback(TEXT[id], my); }
       else {
         await new Promise(res => {
-          const s = c.createBufferSource(); s.buffer = clip.buf; s.connect(vGain); s.onended = res; cur = s; lip(true); if (typeof pipCue === 'function') pipCue(id);
+          const s = c.createBufferSource(); s.buffer = clip.buf; s.connect(vGain); s.onended = res; cur = s; lip(true); spokenN++; if (typeof pipCue === 'function') pipCue(id);
           if (clip.whole) s.start(); else s.start(0, Math.max(0, clip.off - .03), clip.dur + .12);
           if (api.onStart) api.onStart(id, clip.dur);
         });
@@ -1430,6 +1430,7 @@ const Sound = (() => {
     memSeconds() { return Object.values(clips).reduce((t, e) => t + (e.v ? e.v.buf.duration : 0), 0); },
     memBytes() { return Object.values(files).reduce((t, e) => t + (e.v ? e.v.ab.byteLength : 0), 0); },
     _clip: load,   // for testing
+    get spoken() { return spokenN; },
     get voiceOn() { return voiceOn; }, set voiceOn(v) { voiceOn = v; store.set('pr-voice', v); if (!v) stopVoice(); },
     get sfxOn() { return sfxOn; }, set sfxOn(v) { sfxOn = v; store.set('pr-sfx', v); },
   };
@@ -5559,7 +5560,7 @@ Sound.preload(['welcome', ...PIP_LINES, 'pip_spin', 'pip_fly', 'pip_dance']);
 const HB = 'pr-hb';
 function beat(extra) {
   try { localStorage.setItem(HB, JSON.stringify(Object.assign({ t: Date.now(), g: current ? current.name : '', s: subLabel, v: document.visibilityState,
-    p: played, b: bootT }, extra || {}))); } catch (e) {}
+    p: played, b: bootT, vo: Sound.voiceOn, sf: Sound.sfxOn, n: Sound.spoken }, extra || {}))); } catch (e) {}
 }
 function hideRestartNote() { const n = $('#restartNote'); if (n) n.hidden = true; }
 (function resume() {
@@ -5573,7 +5574,8 @@ function hideRestartNote() { const n = $('#restartNote'); if (n) n.hidden = true
   if (!fresh && recent) {
     const where = [hb.g, hb.s].filter(Boolean).join(' › ') || 'the game shelf', mins = Math.max(1, Math.round((hb.t - hb.b) / 60e3));
     const how = hb.v === 'hidden' ? 'while the app was in the background' : 'during play';
-    const note = `The page restarted ${how} (in ${where}, after about ${mins} min).`;
+    const extra = hb.vo === undefined ? '' : ` · voice ${hb.vo ? 'on' : 'off'}, sounds ${hb.sf ? 'on' : 'off'}, ${hb.n || 0} lines, ${hb.p || 0} games`;
+    const note = `The page restarted ${how} (in ${where}, after about ${mins} min${extra}).`;
     const n = $('#restartNote'); n.textContent = note; n.hidden = false;
     try { const log = JSON.parse(localStorage.getItem('pr-restarts') || '[]'); log.push(new Date().toLocaleString() + ': ' + note); localStorage.setItem('pr-restarts', JSON.stringify(log.slice(-10))); } catch (e) {}
   }
