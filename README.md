@@ -1,2 +1,2 @@
-# Pip’s Playroom
+# Pip’s Playhouse
 Learning games for little kids, hosted by Pip the parrot.

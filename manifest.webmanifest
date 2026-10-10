@@ -1,6 +1,6 @@
 {
-  "name": "Pip’s Playroom",
-  "short_name": "Playroom",
+  "name": "Pip’s Playhouse",
+  "short_name": "Playhouse",
   "description": "Learning games for little kids, hosted by Pip the parrot.",
   "start_url": "./",
   "scope": "./",

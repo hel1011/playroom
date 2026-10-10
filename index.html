@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Playroom">
+<meta name="apple-mobile-web-app-title" content="Playhouse">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
 /* standalone app: keep clear of phone notches and home bars */
@@ -18,7 +18,7 @@ body { padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: max(12p
   padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));
   overscroll-behavior: none; user-select: none; -webkit-user-select: none; }
 </style>
-<title>Pip’s Playroom</title>
+<title>Pip’s Playhouse</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Grandstander:wght@600;800&family=Lexend:wght@400;500;600&display=swap">
@@ -1121,7 +1121,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 <div id="app">
   <section class="screen" id="splash">
     <button class="pipwrap" id="pipSplash" type="button" aria-label="Pip the parrot"><svg class="pip big wave" viewBox="0 0 100 100" aria-hidden="true"></svg><span class="perch"></span></button>
-    <h1>Pip’s <span>Playroom</span></h1>
+    <h1>Pip’s <span>Playhouse</span></h1>
     <p class="whoq" id="whoQ">Who's playing today?</p>
     <div class="players" id="players"></div>
     <form class="newplayer" id="newPlayer" hidden autocomplete="off">
@@ -1139,7 +1139,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 
   <section class="screen" id="shelf" hidden>
     <div class="topbar">
-      <p class="logo">Pip’s <span>Playroom</span></p>
+      <p class="logo">Pip’s <span>Playhouse</span></p>
       <button class="playerbtn" id="playerBtn" type="button" aria-label="Switch player"></button>
       <span class="spacer"></span>
       <button class="stars spendbtn" id="shelfStars" type="button" aria-label="Your stars. Tap to spend them in Pip's Treehouse"><svg viewBox="0 0 24 24"><use href="#starArt"/></svg><b class="starN">0</b><span class="spendlbl">Spend 🏡</span></button>
@@ -1571,7 +1571,7 @@ function freshStart() {
   try { localStorage.setItem('pr-fresh-at', String(Date.now())); } catch (e) {}
   $('#game').hidden = true; $('#shelf').hidden = false;
   const t = document.createElement('div'); t.className = 'tidy';
-  t.innerHTML = `<svg class="pip" viewBox="0 0 100 100" aria-hidden="true">${PIP_ART}</svg><p>Tidying up the playroom…</p>`;
+  t.innerHTML = `<svg class="pip" viewBox="0 0 100 100" aria-hidden="true">${PIP_ART}</svg><p>Tidying up the playhouse…</p>`;
   document.body.appendChild(t); Sound.stopVoice();
   setTimeout(() => location.reload(), 900); return true;
 }
