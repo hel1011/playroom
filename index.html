@@ -497,6 +497,8 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 /* sorting */
 .srule { display: inline-flex; align-items: center; gap: 12px; background: var(--card); border-radius: 22px; padding: 8px 18px; box-shadow: 0 4px 0 var(--edge); font-size: 26px; }
 .srule .swatch-dot { width: 46px; height: 46px; }
+/* the color in a rule is written as its word, in that color, with a dark outline so yellow still reads on white */
+.srule .cword { font: 800 40px/46px var(--f-display); letter-spacing: .5px; text-shadow: -1.5px -1.5px 0 var(--o), 1.5px -1.5px 0 var(--o), -1.5px 1.5px 0 var(--o), 1.5px 1.5px 0 var(--o), 0px -1.5px 0 var(--o), 0px 1.5px 0 var(--o), -1.5px 0px 0 var(--o), 1.5px 0px 0 var(--o), 0 3px 0 rgba(0,0,0,.12); }
 .sruleWrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .srule .cond { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; }
 .srule .mark { width: 30px; height: 30px; border-radius: 8px; border: 3px dashed var(--edge); font: 800 20px/24px var(--f-display); text-align: center; font-style: normal; }
@@ -2395,7 +2397,7 @@ function logicGame(root, api) {
       ? [{ c, s }, { c, s }, { c, s: os() }, { c, s: os() }, { c: oc(), s }, { c: oc(), s }]
       : [{ c, s: os() }, { c, s: os() }, { c: oc(), s }, { c: oc(), s }, { c: oc(), s: os() }, { c: oc(), s: os() }]);
     const isYes = it => op === 'and' ? (it.c === c && it.s === s) : (it.c === c || it.s === s);
-    box.innerHTML = `<div class="sruleWrap"><div class="srule"><span class="cond cc">${sw(c)}<i class="mark"></i></span>${kw(op.toUpperCase(), op)}<span class="cond cs"><span class="sshape">${shapeSVG(s, c, true)}</span><i class="mark"></i></span></div>
+    box.innerHTML = `<div class="sruleWrap"><div class="srule"><span class="cond cc"><b class="cword" style="color:${LG_COL[c]};--o:${({ red: '#a3221a', blue: '#0f4f94', yellow: '#9c7a00', green: '#1f6b24' })[c]}">${c[0].toUpperCase() + c.slice(1)}</b><i class="mark"></i></span>${kw(op.toUpperCase(), op)}<span class="cond cs"><span class="sshape">${shapeSVG(s, c, true)}</span><i class="mark"></i></span></div>
       <div class="need ${op}">${op === 'and' ? 'Needs <b>BOTH</b> <i>✓</i><i>✓</i>' : 'Needs just <b>ONE</b> <i>✓</i>'}</div></div>
       <div class="belt"><div class="stripes"></div><div class="onbelt"></div></div>
       <div class="baskets"><button class="basket yes" type="button" aria-label="Yes basket"><span>✔</span><b class="cnt">0</b></button><button class="basket no" type="button" aria-label="No basket"><span>✘</span><b class="cnt">0</b></button></div>`;
