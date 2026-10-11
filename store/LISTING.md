@@ -40,7 +40,7 @@ MADE FOR FAMILIES
 - **Name** [30]: Pip's Playhouse
 - **Subtitle** [30]: Learning games for little kids
 - **Promotional text** [170]: Join Pip the parrot for read-along stories, science experiments, tracing, counting, puzzles and thinking games. No ads, no in-app purchases, works offline.
-- **Keywords** [100]: preschool,kindergarten,toddler,abc,phonics,tracing,counting,math,science,stories,puzzle,logic,parrot
+- **Keywords** [100]: preschool,kindergarten,toddler,abc,letters,tracing,counting,math,science,stories,puzzle,logic,parrot
 - **Primary category**: Education
 - **Secondary category** (optional): Games, Educational
 - **Kids category**: yes. Age band: Ages 5 and Under is suggested (Ages 6–8 also fits the science and logic games; your call).
