@@ -1,0 +1,8 @@
+{
+  "appId": "com.pipsplayhouse.app",
+  "appName": "Pip's Playhouse",
+  "webDir": "www",
+  "backgroundColor": "#e3f3fb",
+  "ios": { "contentInset": "never" },
+  "android": { "allowMixedContent": false }
+}

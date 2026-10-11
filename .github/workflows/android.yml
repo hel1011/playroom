@@ -1,0 +1,45 @@
+name: Android build
+# Builds the signed Android App Bundle (.aab) for Google Play and attaches it to a GitHub release for download.
+# Until the ANDROID_KEYSTORE_PASSWORD secret is added, it builds an unsigned bundle just to check that the app compiles.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['app/**', 'index.html', 'audio/**', '.github/workflows/android.yml']
+concurrency: { group: android, cancel-in-progress: true }
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      HAS_KEY: "${{ secrets.ANDROID_KEYSTORE_PASSWORD != '' }}"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - name: Put the web app into the Android project
+        working-directory: app
+        run: npm ci && node scripts/sync-web.mjs && npx cap sync android
+      - name: Build the app bundle
+        working-directory: app/android
+        env:
+          PW: '${{ secrets.ANDROID_KEYSTORE_PASSWORD }}'
+          VERSION_CODE: '${{ github.run_number }}'
+        run: |
+          if [ -n "$PW" ]; then
+            export ANDROID_KEYSTORE_FILE="$PWD/upload-key.p12" ANDROID_KEYSTORE_PASSWORD="$PW" ANDROID_KEY_PASSWORD="$PW" ANDROID_KEY_ALIAS=upload
+          else echo "::warning::No ANDROID_KEYSTORE_PASSWORD secret yet, so this bundle is unsigned and only checks that the app compiles."; fi
+          chmod +x gradlew && ./gradlew --no-daemon bundleRelease
+          ls -la app/build/outputs/bundle/release/
+      - name: Attach the signed bundle to a release
+        if: env.HAS_KEY == 'true'
+        env:
+          GH_TOKEN: '${{ github.token }}'
+        run: |
+          cp app/android/app/build/outputs/bundle/release/app-release.aab "pips-playhouse-${{ github.run_number }}.aab"
+          gh release create "android-${{ github.run_number }}" "pips-playhouse-${{ github.run_number }}.aab" --prerelease \
+            --title "Android build ${{ github.run_number }}" --notes "Signed app bundle for Google Play (version code ${{ github.run_number }}). Upload this .aab in Play Console."
