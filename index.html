@@ -43,7 +43,7 @@ body { padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: max(12p
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html, body { height: 100%; overscroll-behavior: none; }
+html, body { height: 100%; height: var(--app-h, 100%); overscroll-behavior: none; }
 #app { touch-action: manipulation; }
 body {
   margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.4;
@@ -505,7 +505,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .pg-strip.free span { font: 800 18px/1.2 var(--f-display); color: var(--muted); text-align: center; padding: 6px; }
 .pg-title { font: 800 15px/1 var(--f-display); color: var(--muted); text-align: center; }
 .pg-notes { display: flex; gap: 8px; justify-content: safe center; overflow-x: auto; padding: 12px 8px 3px; }
-.pn { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 0 0 auto; }
+.pn { display: flex; flex-direction: column; align-items: center; gap: 9px; flex: 0 0 auto; }
 .pn b { width: 38px; height: 38px; border-radius: 50%; background: var(--c); color: #fff; display: grid; place-items: center; font: 800 18px/1 var(--f-display); text-shadow: 0 1px 0 rgba(0,0,0,.28); box-shadow: inset 0 -3px 0 rgba(0,0,0,.15); opacity: .4; transition: transform .2s, opacity .2s; }
 .pn small { font: 700 13px/1 var(--f-body); color: var(--muted); white-space: nowrap; }
 .pn.ok b { opacity: 1; }
@@ -525,7 +525,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .pk.w.lit::after { opacity: .45; }
 @keyframes pkglow { 50% { opacity: .55; } }
 .pk.w.pk-go { box-shadow: inset 0 -10px 0 #e4e9ef, 0 0 0 4px var(--c); z-index: 1; }
-.pk-arrow { position: absolute; z-index: 1; bottom: calc(16px + min(44px, 72%) + 8px); left: 50%; transform: translateX(-50%); color: var(--c); font-style: normal; font-size: 24px; line-height: 1; opacity: 0; text-shadow: 0 2px 0 rgba(0,0,0,.18); }
+.pk-arrow { position: absolute; z-index: 1; bottom: calc(16px + min(44px, 72%) + 16px); left: 50%; transform: translateX(-50%); color: var(--c); font-style: normal; font-size: 24px; line-height: 1; opacity: 0; text-shadow: 0 2px 0 rgba(0,0,0,.18); }
 .pk.pk-go .pk-arrow { opacity: 1; animation: pkbob .55s ease-in-out infinite alternate; }
 @keyframes pkbob { to { transform: translate(-50%, 7px); } }
 .pk.nudge { animation: pknudge .4s; }
@@ -542,7 +542,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .pg-phone { width: 70px; height: 120px; margin-bottom: 18px; border: 6px solid #22324a; border-radius: 16px; position: relative; background: linear-gradient(#fff 0 60%, #3a3340 60%); animation: pgturn 2.6s ease-in-out infinite; }
 .pg-phone i { position: absolute; left: 50%; top: 6px; width: 16px; height: 4px; border-radius: 4px; background: #22324a; transform: translateX(-50%); }
 @keyframes pgturn { 0%, 20% { transform: rotate(0); } 50%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
-@media (max-height: 520px) { .pg-pick { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; } .pg-art svg { max-width: 84px; } .pg-card { font-size: 14px; padding: 8px; } .pg { padding: 6px; gap: 6px; } .pg-title { display: none; } .pn b { width: 30px; height: 30px; font-size: 15px; } .pn small { font-size: 11px; } .pg-strip { padding: 6px 10px; gap: 4px; } .pk.w { padding-bottom: 10px; } .pk-arrow { bottom: calc(10px + min(44px, 72%) + 6px); } }
+@media (max-height: 520px) { .pg-pick { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; } .pg-art svg { max-width: 84px; } .pg-card { font-size: 14px; padding: 8px; } .pg { padding: 6px; gap: 6px; } .pg-title { display: none; } .pn b { width: 30px; height: 30px; font-size: 15px; } .pn small { font-size: 11px; } .pg-strip { padding: 6px 10px; gap: 4px; } .pk.w { padding-bottom: 10px; } .pk-arrow { bottom: calc(10px + min(44px, 72%) + 13px); } }
 /* sorting */
 .srule { display: inline-flex; align-items: center; gap: 12px; background: var(--card); border-radius: 22px; padding: 8px 18px; box-shadow: 0 4px 0 var(--edge); font-size: 26px; }
 .srule .swatch-dot { width: 46px; height: 46px; }
@@ -1164,6 +1164,13 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
   .trace .sticker { font-size: 44px; min-height: 48px; }
   .choice { width: 70px; height: 70px; font-size: 36px; }
 }
+@media (max-height: 520px) and (orientation: landscape) {
+  .gamebar { gap: 8px; }
+  .gamebar .pip { width: 38px; height: 38px; }
+  .gamebar .iconbtn { width: 42px; height: 42px; }
+  .gamebar .bubble { font-size: 13px; padding-block: 6px; }
+  .screen { gap: 8px; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
@@ -1264,6 +1271,13 @@ const PIP_ART = `
     <path d="M46.5 39.6 Q50 38.4 53.5 39.6" stroke="#fff" stroke-width="1.2" opacity=".6" fill="none" stroke-linecap="round"/>
   </g>
 </g>`;
+// Keep the app exactly as tall as the visible screen. Phones change that when turned sideways or when the browser's
+// bars show or hide, and iPhones report the new size a moment after turning, so check again shortly after.
+(function fitHeight() {
+  const set = () => document.documentElement.style.setProperty('--app-h', Math.round(window.innerHeight) + 'px');
+  set(); addEventListener('resize', set);
+  addEventListener('orientationchange', () => { set(); [150, 400, 900].forEach(ms => setTimeout(set, ms)); });
+})();
 (function () {
 'use strict';
 const $ = (s, r = document) => r.querySelector(s);
