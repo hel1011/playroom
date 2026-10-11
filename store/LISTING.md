@@ -16,8 +16,9 @@ Contact email: still to be filled in (it also goes on the privacy and support pa
 Pip's Playhouse is a bright, friendly learning app for little kids, hosted by Pip the parrot. Pip talks children through every game in a warm, natural voice, so kids who can't read yet can still play on their own.
 
 WHAT'S INSIDE
-• Story Time: 10 read-along picture books. Words light up as Pip reads, and the answer choices light up as Pip reads each question.
-• Science Lab: 26 hands-on experiments, from volcanoes, magnets and rainbows to the solar system, the seasons and how vaccines help your body.
+• Story Time: 11 read-along picture books. Words light up as Pip reads, and the answer choices light up as Pip reads each question.
+• Science Lab: 28 hands-on experiments, from volcanoes, magnets and rainbows to fossils, bees, the solar system and how vaccines help your body.
+• Piano Songs: play six favorite songs on a color-coded piano by following the glowing keys, or make up your own music.
 • Trace It: trace capital letters, lowercase letters and numbers.
 • Count With Me, Add & Take Away and Dot-to-Dot for early math.
 • Rhyme Time for early reading.
@@ -39,8 +40,8 @@ MADE FOR FAMILIES
 
 - **Name** [30]: Pip's Playhouse
 - **Subtitle** [30]: Learning games for little kids
-- **Promotional text** [170]: Join Pip the parrot for read-along stories, science experiments, tracing, counting, puzzles and thinking games. No ads, no in-app purchases, works offline.
-- **Keywords** [100]: preschool,kindergarten,toddler,abc,letters,tracing,counting,math,science,stories,puzzle,logic,parrot
+- **Promotional text** [170]: Join Pip the parrot for read-along stories, science experiments, piano songs, tracing, counting, puzzles and thinking games. No ads, no in-app purchases, works offline.
+- **Keywords** [100]: preschool,kindergarten,toddler,abc,letters,tracing,counting,math,science,stories,puzzle,logic,piano
 - **Primary category**: Education
 - **Secondary category** (optional): Games, Educational
 - **Kids category**: yes. Age band: Ages 5 and Under is suggested (Ages 6–8 also fits the science and logic games; your call).
