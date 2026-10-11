@@ -18,6 +18,7 @@ Pip's Playhouse is a bright, friendly learning app for little kids, hosted by Pi
 WHAT'S INSIDE
 • Story Time: 11 read-along picture books. Words light up as Pip reads, and the answer choices light up as Pip reads each question.
 • Science Lab: 28 hands-on experiments, from volcanoes, magnets and rainbows to fossils, bees, the solar system and how vaccines help your body.
+• Town Helpers: join sisters Ellie and Zoey and their dog Cooper as they help eight neighbors around town, counting, matching numbers, sounding out letters, planting, shopping, recycling, crossing the street safely and caring for a pet. Progress is saved along the way.
 • Piano Songs: play six favorite songs on a color-coded piano by following the glowing keys, or make up your own music.
 • Trace It: trace capital letters, lowercase letters and numbers.
 • Count With Me, Add & Take Away and Dot-to-Dot for early math.
