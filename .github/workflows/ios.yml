@@ -37,6 +37,7 @@ jobs:
           xcodebuild -project App.xcodeproj -scheme App -configuration Release -destination 'generic/platform=iOS' build CODE_SIGNING_ALLOWED=NO > build.log 2>&1 || { grep -E "error:|warning: .*fail" build.log | head -40 > err.txt; [ -s err.txt ] || tail -40 build.log > err.txt; echo "::error title=iOS build failed::$(sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g' err.txt)"; exit 1; }
           tail -5 build.log
       - name: Register the app ID
+        id: asc
         if: steps.keys.outputs.ok == '1'
         env:
           ASC_KEY_ID: '${{ secrets.ASC_KEY_ID }}'
@@ -52,7 +53,7 @@ jobs:
         env:
           ASC_KEY_ID: '${{ secrets.ASC_KEY_ID }}'
           ASC_ISSUER_ID: '${{ secrets.ASC_ISSUER_ID }}'
-          TEAM: '${{ secrets.APPLE_TEAM_ID }}'
+          TEAM: '${{ secrets.APPLE_TEAM_ID || steps.asc.outputs.team }}'
         run: |
           set -o pipefail
           AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")

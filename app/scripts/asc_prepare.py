@@ -18,12 +18,17 @@ def api(method, path, body=None):
     except urllib.error.HTTPError as e:
         print(f'App Store Connect said {e.code} for {method} {path}:', e.read().decode()[:800]); sys.exit(1)
 
-ids = api('GET', f'/v1/bundleIds?filter[identifier]={BUNDLE}')['data']
-if not [b for b in ids if b['attributes']['identifier'] == BUNDLE]:
-    api('POST', '/v1/bundleIds', {'data': {'type': 'bundleIds', 'attributes': {'identifier': BUNDLE, 'name': 'Pips Playhouse', 'platform': 'IOS'}}})
+ids = [b for b in api('GET', f'/v1/bundleIds?filter[identifier]={BUNDLE}')['data'] if b['attributes']['identifier'] == BUNDLE]
+if not ids:
+    ids = [api('POST', '/v1/bundleIds', {'data': {'type': 'bundleIds', 'attributes': {'identifier': BUNDLE, 'name': 'Pips Playhouse', 'platform': 'IOS'}}})['data']]
     print('Registered the app ID', BUNDLE)
 else:
     print('App ID already registered:', BUNDLE)
+# the app ID prefix (seedId) is the team ID, which the signing step needs
+team = ids[0]['attributes'].get('seedId', '')
+print('Team ID:', team)
+if os.environ.get('GITHUB_OUTPUT'):
+    with open(os.environ['GITHUB_OUTPUT'], 'a') as f: f.write(f'team={team}\n')
 apps = api('GET', f'/v1/apps?filter[bundleId]={BUNDLE}')['data']
 if not apps:
     print(f"::error::The app isn't in App Store Connect yet. In App Store Connect choose Apps, then the + button, then New App, and pick the bundle ID {BUNDLE}. Then run this build again.")

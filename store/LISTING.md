@@ -50,7 +50,7 @@ MADE FOR FAMILIES
 - **Bundle ID**: com.pipsplayhouse.app
 - **SKU** (internal, anything unique): PIPSPLAYHOUSE1
 - **Notes for the reviewer**: No login is needed. On the first screen, type any name and age and tap "Let's play!". All content is built into the app and works offline. There are no ads, purchases, accounts or links out of the app. The camera and photo library are only used if someone taps "Add photos" in Photo Puzzle, and photos stay on the device.
-- **Screenshots**: store/app-store/iphone-6.9 (iPhone) and store/app-store/ipad-13 (iPad), 8 each.
+- **Screenshots**: 8 for each size. iPhone 6.3" (the size Apple requires): store/app-store/iphone-6.3. iPhone 6.9" (optional): store/app-store/iphone-6.9. iPad 13" (required because the app runs on iPad): store/app-store/ipad-13.
 
 ---
 
