@@ -33,7 +33,15 @@ jobs:
           if [ -n "$PW" ]; then
             export ANDROID_KEYSTORE_FILE="$PWD/upload-key.p12" ANDROID_KEYSTORE_PASSWORD="$PW" ANDROID_KEY_PASSWORD="$PW" ANDROID_KEY_ALIAS=upload
           else echo "::warning::No ANDROID_KEYSTORE_PASSWORD secret yet, so this bundle is unsigned and only checks that the app compiles."; fi
-          chmod +x gradlew && ./gradlew --no-daemon bundleRelease
+          chmod +x gradlew
+          set -o pipefail
+          if ! ./gradlew --no-daemon bundleRelease 2>&1 | tee build.log; then
+            # surface the end of the log as an annotation so it can be read without opening the full log
+            grep -iE "error|what went wrong|exception|failed" -A4 build.log | tail -60 > err.txt || true
+            [ -s err.txt ] || tail -60 build.log > err.txt
+            echo "::error title=Android build failed::$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' err.txt)"
+            exit 1
+          fi
           ls -la app/build/outputs/bundle/release/
       - name: Attach the signed bundle to a release
         if: env.HAS_KEY == 'true'
