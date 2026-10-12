@@ -559,7 +559,8 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .tw-svg, .tw-stage { touch-action: none; }
 .tw-lbl { font: 800 10.5px var(--f-display); fill: #3a3340; }
 .tw-lbl.big { font-size: 12.5px; } .tw-lbl.wh { fill: #fff; font-size: 10px; }
-.tw-num { font: 800 26px var(--f-display); fill: #3a3340; } .tw-num.sm { font-size: 15px; } .tw-num.xs { font-size: 12px; } .tw-num.wh { fill: #fff; font-size: 22px; }
+.tw-num { font: 800 26px var(--f-display); fill: #3a3340; } .tw-num.lg { font-size: 30px; } .tw-num.md { font-size: 20px; } .tw-num.sm { font-size: 15px; } .tw-num.xs { font-size: 12px; } .tw-num.wh { fill: #fff; font-size: 22px; } .tw-num.wh.lg { font-size: 30px; }
+.tw-held { filter: drop-shadow(0 6px 4px rgba(20,40,60,.3)); }
 .tw-stop .tw-glow { opacity: 0; }
 .tw-stop.next .tw-glow { animation: twglow 1.3s ease-in-out infinite; }
 @keyframes twglow { 50% { opacity: .9; } }
@@ -6040,9 +6041,10 @@ function townGame(root, api) {
       },
       // drag a picture; drop(x, y) returns true if it was used, otherwise it slides home
       dragItem(g, hx, hy, drop, opts = {}) {
-        let x = hx, y = hy, used = false; const set = () => g.setAttribute('transform', `translate(${x} ${y})${opts.scale ? ` scale(${opts.scale})` : ''}`); set(); g.style.cursor = 'grab';
-        c.drag(g, { start: () => { if (!used) c.noHand(); }, move: ([nx, ny]) => { if (used) return; x = nx; y = ny; set(); },
-          end: async () => { if (used) return; const r = await drop(x, y, g); if (r) { used = true; g.style.cursor = 'default'; } else { const sx = x, sy = y; await c.tween(k => { x = sx + (hx - sx) * k; y = sy + (hy - sy) * k; set(); }, 260); } } });
+        let x = hx, y = hy, used = false, held = false; const base = opts.scale || 1;
+        const set = () => g.setAttribute('transform', `translate(${x} ${y}) scale(${held ? base * 1.15 : base})`); set(); g.style.cursor = 'grab';
+        c.drag(g, { start: () => { if (!used) { c.noHand(); held = true; g.classList.add('tw-held'); set(); } }, move: ([nx, ny]) => { if (used) return; x = nx; y = ny; set(); },
+          end: async () => { held = false; g.classList.remove('tw-held'); if (used) return; set(); const r = await drop(x, y, g); if (r) { used = true; g.style.cursor = 'default'; } else { const sx = x, sy = y; await c.tween(k => { x = sx + (hx - sx) * k; y = sy + (hy - sy) * k; set(); }, 260); } } });
         return { moveTo: (nx, ny) => { x = nx; y = ny; set(); } };
       },
       say(ids) { if (!alive()) return Promise.resolve(); return Sound.say(ids); },
@@ -6069,88 +6071,89 @@ function townGame(root, api) {
 // ---------- 1. Bakery: count cookies onto each plate ----------
 function twBakery(c) {
   c.svg.innerHTML = `<rect width="400" height="300" fill="#ffe8ee"/>${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => `<path d="M${i * 44 - 4} 0 L${i * 44 + 40} 0 L${i * 44 + 40} 26 Q${i * 44 + 18} 40 ${i * 44 - 4} 26Z" fill="${i % 2 ? '#fff' : '#ff9ec0'}" stroke="${TW_O}" stroke-width="1.6"/>`).join('')}
-    <rect x="250" y="44" width="110" height="60" rx="6" fill="#fff6ea" stroke="${TW_O}" stroke-width="2"/>${[[270, 74], [300, 70], [330, 76]].map(([x, y]) => `<g transform="translate(${x} ${y}) scale(.8)">${TW_ICON.cake}</g>`).join('')}
-    ${twIll('bunny', 330, 196, .95)}${twKids(14, 196, .95)}
-    <rect y="186" width="400" height="114" fill="#c98a52"/><rect y="182" width="400" height="10" rx="3" fill="#e8b47a" stroke="${TW_O}" stroke-width="2"/>
-    <rect x="20" y="214" width="150" height="70" rx="10" fill="#9aa0ab" stroke="${TW_O}" stroke-width="2.4"/>
-    <g id="bkTicket"></g><ellipse cx="270" cy="250" rx="66" ry="24" fill="#fff" stroke="${TW_O}" stroke-width="2.4"/><ellipse cx="270" cy="250" rx="50" ry="16" fill="none" stroke="#e6ecf3" stroke-width="3"/>
-    <g id="bkOn"></g><g id="bkTray"></g>`;
-  const ROUNDS = [3, 5, 4], SPOTS = [[270, 244], [244, 248], [296, 248], [258, 258], [284, 258]];
+    <rect x="150" y="44" width="110" height="56" rx="6" fill="#fff6ea" stroke="${TW_O}" stroke-width="2"/>${[[170, 72], [200, 68], [230, 74]].map(([x, y]) => `<g transform="translate(${x} ${y}) scale(.8)">${TW_ICON.cake}</g>`).join('')}
+    ${twIll('bunny', 344, 184, .95)}${twKids(8, 184, .9)}
+    <rect y="176" width="400" height="124" fill="#c98a52"/><rect y="172" width="400" height="10" rx="3" fill="#e8b47a" stroke="${TW_O}" stroke-width="2"/>
+    <rect x="8" y="192" width="200" height="104" rx="12" fill="#9aa0ab" stroke="${TW_O}" stroke-width="2.4"/>
+    <ellipse cx="304" cy="254" rx="88" ry="34" fill="#fff" stroke="${TW_O}" stroke-width="2.6"/><ellipse cx="304" cy="254" rx="68" ry="22" fill="none" stroke="#e6ecf3" stroke-width="3"/>
+    <g id="bkTicket"></g><g id="bkOn"></g><g id="bkTray"></g>`;
+  const ROUNDS = [3, 5, 4], SPOTS = [[304, 248], [270, 252], [338, 252], [287, 268], [321, 268]];
   let r = 0, n = 0, busy = false;
   const tray = c.$('#bkTray'), on = c.$('#bkOn');
   function ticket() {
-    const need = ROUNDS[r]; c.$('#bkTicket').innerHTML = `<g transform="translate(270 196)"><rect x="-44" y="-22" width="88" height="34" rx="6" fill="#fff" stroke="${TW_O}" stroke-width="2"/><text x="-24" y="4" class="tw-num" text-anchor="middle">${need}</text>
-      ${[...Array(need)].map((_, i) => `<circle cx="${-2 + (i % 3) * 13}" cy="${-8 + Math.floor(i / 3) * 13}" r="5" fill="#e8a75a" stroke="${TW_O}" stroke-width="1.4"/>`).join('')}</g>`;
+    const need = ROUNDS[r]; c.$('#bkTicket').innerHTML = `<g transform="translate(304 196)"><rect x="-52" y="-24" width="104" height="40" rx="8" fill="#fff" stroke="${TW_O}" stroke-width="2.2"/><text x="-30" y="7" class="tw-num" text-anchor="middle">${need}</text>
+      ${[...Array(need)].map((_, i) => `<circle cx="${-4 + (i % 3) * 15}" cy="${-10 + Math.floor(i / 3) * 15}" r="6" fill="#e8a75a" stroke="${TW_O}" stroke-width="1.4"/>`).join('')}</g>`;
   }
   function addCookie(i) {
-    const hx = 44 + (i % 4) * 34, hy = 236 + Math.floor(i / 4) * 30, g = c.mk('g', {}, tray); g.innerHTML = `<circle r="18" fill="transparent"/>${TW_ICON.cookie}`;
+    const hx = 36 + (i % 4) * 48, hy = 222 + Math.floor(i / 4) * 48, g = c.mk('g', {}, tray); g.innerHTML = `<circle r="25" fill="transparent"/>${TW_ICON.cookie}`;
     c.dragItem(g, hx, hy, async (x, y) => {
-      if (busy || Math.hypot(x - 270, y - 250) > 74) return false;
-      const [px, py] = SPOTS[n]; g.setAttribute('transform', `translate(${px} ${py})`); on.appendChild(g); n++; Sound.fx.place(); c.say('n_' + n);
+      if (busy || Math.abs(x - 304) > 104 || Math.abs(y - 254) > 56) return false;
+      const [px, py] = SPOTS[n]; g.setAttribute('transform', `translate(${px} ${py}) scale(1.3)`); on.appendChild(g); n++; Sound.fx.place(); c.say('n_' + n);
       c.later(() => addCookie(i), 400);
-      if (n === ROUNDS[r]) { busy = true; Sound.fx.match(); c.spark(270, 246); await c.wait(1100); r++;
+      if (n === ROUNDS[r]) { busy = true; Sound.fx.match(); c.spark(304, 250); await c.wait(1100); r++;
         if (r === ROUNDS.length) return c.finish(['tw_bk_3']), true;
         on.innerHTML = ''; n = 0; ticket(); busy = false; c.say(praiseId()).then(() => c.say('tw_bk_need' + ROUNDS[r])); }
       return true;
-    });
+    }, { scale: 1.55 });
   }
   for (let i = 0; i < 8; i++) addCookie(i);
-  ticket(); c.hand(44, 236);
+  ticket(); c.hand(36, 222);
   c.intro(['tw_bk_1', 'tw_bk_2', 'tw_bk_need' + ROUNDS[0]]);
 }
 
 // ---------- 2. Post office: deliver each letter to the house with the same number ----------
 function twPost(c) {
   const COLS = ['#ff9ec0', '#9fd8ff', '#ffe08a', '#b8f0a0', '#e0c8ff', '#ffc89a'];
-  c.svg.innerHTML = `<rect width="400" height="300" fill="#bfe9ff"/><rect y="168" width="400" height="132" fill="#a8e07a"/><rect y="236" width="400" height="64" fill="#d6d0c4"/>
-    ${COLS.map((col, i) => { const x = 36 + i * 66; return `<g transform="translate(${x} 0)"><rect x="-26" y="96" width="52" height="64" fill="${col}" stroke="${TW_O}" stroke-width="2.4"/><path d="M-32 98 L0 70 L32 98Z" fill="#e8413c" stroke="${TW_O}" stroke-width="2.4" stroke-linejoin="round"/>
-      <rect x="-8" y="126" width="16" height="34" fill="#8a5a3a" stroke="${TW_O}" stroke-width="2"/><rect x="-21" y="104" width="13" height="13" fill="#fff" stroke="${TW_O}" stroke-width="1.8"/><rect x="8" y="104" width="13" height="13" fill="#fff" stroke="${TW_O}" stroke-width="1.8"/>
-      <g class="po-box" data-n="${i + 1}" transform="translate(0 194)"><rect x="-2" y="0" width="4" height="34" fill="#7a5a3a"/><rect x="-16" y="-20" width="32" height="22" rx="8" fill="#4a8bff" stroke="${TW_O}" stroke-width="2"/>
-        <rect x="-11" y="-14" width="22" height="16" rx="3" fill="#fff"/><text y="0" text-anchor="middle" class="tw-num sm">${i + 1}</text><path class="po-flag" d="M16 -16 L16 -30 L26 -26 L16 -22" fill="#e8413c" stroke="${TW_O}" stroke-width="1.6"/></g></g>`; }).join('')}
-    ${twIll('fox', 360, 300, .62, true)}<g id="poLetters"></g>`;
+  c.svg.innerHTML = `<rect width="400" height="300" fill="#bfe9ff"/><rect y="150" width="400" height="150" fill="#a8e07a"/><rect y="226" width="400" height="74" fill="#d6d0c4"/>
+    ${COLS.map((col, i) => { const x = 36 + i * 66; return `<g transform="translate(${x} 0)"><rect x="-26" y="78" width="52" height="64" fill="${col}" stroke="${TW_O}" stroke-width="2.4"/><path d="M-32 80 L0 52 L32 80Z" fill="#e8413c" stroke="${TW_O}" stroke-width="2.4" stroke-linejoin="round"/>
+      <rect x="-8" y="108" width="16" height="34" fill="#8a5a3a" stroke="${TW_O}" stroke-width="2"/><rect x="-21" y="86" width="13" height="13" fill="#fff" stroke="${TW_O}" stroke-width="1.8"/><rect x="8" y="86" width="13" height="13" fill="#fff" stroke="${TW_O}" stroke-width="1.8"/>
+      <g class="po-box" data-n="${i + 1}" transform="translate(0 186)"><rect x="-3" y="0" width="6" height="40" fill="#7a5a3a"/><rect x="-26" y="-34" width="52" height="36" rx="12" fill="#4a8bff" stroke="${TW_O}" stroke-width="2.4"/>
+        <rect x="-18" y="-27" width="36" height="24" rx="5" fill="#fff"/><text y="-8" text-anchor="middle" class="tw-num md">${i + 1}</text><path class="po-flag" d="M26 -30 L26 -50 L40 -44 L26 -38" fill="#e8413c" stroke="${TW_O}" stroke-width="1.8"/></g></g>`; }).join('')}
+    ${twIll('fox', 372, 300, .5, true)}<g id="poLetters"></g>`;
   const nums = shuffle([1, 2, 3, 4, 5, 6]).slice(0, 4); let done = 0;
   nums.forEach((num, i) => {
-    const g = c.mk('g', {}, c.$('#poLetters')); g.innerHTML = `<circle r="22" fill="transparent"/>${TW_ICON.letter}<circle cx="0" cy="3" r="9" fill="#ffd23f" stroke="${TW_O}" stroke-width="1.6"/><text y="8" text-anchor="middle" class="tw-num xs">${num}</text>`;
-    c.dragItem(g, 40 + i * 70, 268, async (x, y) => {
-      const boxes = [...c.svg.querySelectorAll('.po-box')], hit = boxes.find(b => { const n = +b.dataset.n, bx = 36 + (n - 1) * 66; return Math.abs(x - bx) < 30 && y > 150 && y < 236; });
-      if (!hit) return false;
-      if (+hit.dataset.n !== num) { Sound.fx.wrong(); c.nag('tw_po_no'); return false; }
-      const bx = 36 + (num - 1) * 66; g.setAttribute('transform', `translate(${bx} 180) scale(.4)`); g.style.opacity = 0; g.style.transition = 'opacity .4s';
-      hit.querySelector('.po-flag').classList.add('up'); Sound.fx.snap(); c.spark(bx, 180, 5); c.say('n_' + num); done++;
+    const g = c.mk('g', {}, c.$('#poLetters')); g.innerHTML = `<rect x="-22" y="-18" width="44" height="36" fill="transparent"/>${TW_ICON.letter}<circle cx="0" cy="3" r="9.5" fill="#ffd23f" stroke="${TW_O}" stroke-width="1.6"/><text y="8" text-anchor="middle" class="tw-num xs">${num}</text>`;
+    c.dragItem(g, 46 + i * 84, 262, async (x, y) => {
+      const n = Math.round((x - 36) / 66) + 1, bx = 36 + (n - 1) * 66;
+      if (n < 1 || n > 6 || y < 110 || y > 238) return false;
+      const hit = c.svg.querySelector(`.po-box[data-n="${n}"]`);
+      if (n !== num) { Sound.fx.wrong(); c.nag('tw_po_no'); return false; }
+      g.setAttribute('transform', `translate(${bx} 166) scale(.5)`); g.style.opacity = 0; g.style.transition = 'opacity .4s';
+      hit.querySelector('.po-flag').classList.add('up'); Sound.fx.snap(); c.spark(bx, 166, 5); c.say('n_' + num); done++;
       if (done === nums.length) c.later(() => c.finish(['tw_po_3']), 1100);
       return true;
-    });
+    }, { scale: 1.55 });
   });
-  c.hand(40, 268);
+  c.hand(46, 262);
   c.intro(['tw_po_1', 'tw_po_2']);
 }
 
 // ---------- 3. Library: put each book on the shelf for its first letter ----------
 function twLibrary(c) {
-  const SH = { A: [70, 'apple'], B: [170, 'ball'], C: [270, 'cat'] };
+  const SH = { A: [62, 'apple'], B: [166, 'ball'], C: [270, 'cat'] };
   const BOOKS = shuffle([['apple', 'A'], ['ant', 'A'], ['bear', 'B'], ['ball', 'B'], ['cat', 'C'], ['cake', 'C']]);
-  c.svg.innerHTML = `<rect width="400" height="300" fill="#fff3e2"/><rect y="226" width="400" height="74" fill="#c98a52"/>
-    ${Object.entries(SH).map(([L, [x, pic]]) => `<g transform="translate(${x} 0)"><rect x="-44" y="40" width="88" height="160" rx="4" fill="#a8703e" stroke="${TW_O}" stroke-width="2.4"/>
-      ${[86, 136, 186].map(y => `<rect x="-38" y="${y - 40}" width="76" height="40" fill="#7a4a2a"/><rect x="-40" y="${y}" width="80" height="6" fill="#c08a5a" stroke="${TW_O}" stroke-width="1.6"/>`).join('')}
-      <rect x="-30" y="10" width="60" height="34" rx="8" fill="#fff" stroke="${TW_O}" stroke-width="2.2"/><text x="-12" y="35" text-anchor="middle" class="tw-num">${L}</text><g transform="translate(14 27) scale(.72)">${TW_ICON[pic]}</g></g>`).join('')}
-    ${twIll('turtle', 352, 230, .8, true)}${twKids(300, 300, .55)}
-    <path d="M30 236 L190 236 L180 270 L40 270Z" fill="#4a8bff" stroke="${TW_O}" stroke-width="2.4" stroke-linejoin="round"/><circle cx="56" cy="276" r="8" fill="${TW_O}"/><circle cx="164" cy="276" r="8" fill="${TW_O}"/>
+  c.svg.innerHTML = `<rect width="400" height="300" fill="#fff3e2"/><rect y="214" width="400" height="86" fill="#c98a52"/>
+    ${Object.entries(SH).map(([L, [x, pic]]) => `<g transform="translate(${x} 0)"><rect x="-48" y="48" width="96" height="150" rx="4" fill="#a8703e" stroke="${TW_O}" stroke-width="2.4"/>
+      ${[110, 164].map(y => `<rect x="-42" y="${y - 54}" width="84" height="54" fill="#7a4a2a"/><rect x="-44" y="${y}" width="88" height="6" fill="#c08a5a" stroke="${TW_O}" stroke-width="1.6"/>`).join('')}
+      <rect x="-36" y="6" width="72" height="42" rx="10" fill="#fff" stroke="${TW_O}" stroke-width="2.4"/><text x="-16" y="38" text-anchor="middle" class="tw-num lg">${L}</text><g transform="translate(16 27) scale(.95)">${TW_ICON[pic]}</g></g>`).join('')}
+    ${twIll('turtle', 362, 210, .72, true)}
+    <rect x="10" y="276" width="330" height="12" rx="5" fill="#4a8bff" stroke="${TW_O}" stroke-width="2.2"/><circle cx="40" cy="292" r="7" fill="${TW_O}"/><circle cx="310" cy="292" r="7" fill="${TW_O}"/>
     <g id="lbOn"></g><g id="lbCart"></g>`;
   const filled = { A: 0, B: 0, C: 0 }; let done = 0;
   BOOKS.forEach(([pic, L], i) => {
     const col = ['#ff5a4e', '#ffb020', '#45c46a', '#4a8bff', '#9a6bff', '#ff7aa8'][i];
-    const g = c.mk('g', {}, c.$('#lbCart')); g.innerHTML = `<rect x="-16" y="-20" width="32" height="40" rx="3" fill="${col}" stroke="${TW_O}" stroke-width="2"/><rect x="-11" y="-14" width="22" height="22" rx="4" fill="#fff"/><g transform="translate(0 -3) scale(.62)">${TW_ICON[pic]}</g>`;
-    c.dragItem(g, 46 + i * 26, 222, async (x, y) => {
-      const hit = Object.entries(SH).find(([, [sx]]) => Math.abs(x - sx) < 46 && y > 30 && y < 206); if (!hit) return false;
+    const g = c.mk('g', {}, c.$('#lbCart')); g.innerHTML = `<rect x="-18" y="-22" width="36" height="44" rx="3" fill="${col}" stroke="${TW_O}" stroke-width="2"/><rect x="-13" y="-16" width="26" height="26" rx="4" fill="#fff"/><g transform="translate(0 -3) scale(.74)">${TW_ICON[pic]}</g>`;
+    c.dragItem(g, 36 + i * 54, 246, async (x, y) => {
+      const hit = Object.entries(SH).find(([, [sx]]) => Math.abs(x - sx) < 52 && y < 214); if (!hit) return false;
       const [SL, [sx]] = hit;
       if (SL !== L) { Sound.fx.wrong(); c.nag('tw_lb_no'); return false; }
-      const k = filled[SL]++; c.$('#lbOn').appendChild(g); g.setAttribute('transform', `translate(${sx - 18 + k * 36} ${126 + 25}) scale(.9)`);
+      const k = filled[SL]++; c.$('#lbOn').appendChild(g); g.setAttribute("transform", `translate(${sx - 21 + k * 42} 84) scale(1.05)`);
       Sound.fx.place(); c.say('tw_w_' + pic); done++;
       if (done === BOOKS.length) c.later(() => c.finish(['tw_lb_3']), 1300);
       return true;
-    });
+    }, { scale: 1.3 });
   });
-  c.hand(46, 222);
+  c.hand(36, 246);
   c.intro(['tw_lb_1', 'tw_lb_2']);
 }
 
@@ -6164,13 +6167,13 @@ function twGarden(c) {
     <g id="gdHole" opacity="0"><ellipse cx="200" cy="204" rx="16" ry="6" fill="#4a2e1a"/></g><g id="gdSeed" opacity="0"><ellipse cx="200" cy="203" rx="5" ry="3.5" fill="#7b522c"/></g>
     <g id="gdPlant" transform="translate(200 204) scale(0)"><path d="M0 0 L0 -96" stroke="#3f9a4a" stroke-width="6"/><path d="M0 -40 Q-24 -52 -30 -34 Q-14 -30 0 -40Z M0 -60 Q24 -72 30 -54 Q14 -50 0 -60Z" fill="#5cbf4f" stroke="${TW_O}" stroke-width="2"/>
       <g transform="translate(0 -104)">${[...Array(12)].map((_, i) => `<ellipse cx="0" cy="-20" rx="7" ry="14" fill="#ffd23f" stroke="${TW_O}" stroke-width="1.8" transform="rotate(${i * 30})"/>`).join('')}<circle r="14" fill="#7b4a2a" stroke="${TW_O}" stroke-width="2"/></g></g>
-    <g id="gdDrops"></g>${twIll('squirrel', 330, 262, .8, true)}${twKids(20, 262, .7)}
+    <g id="gdDrops"></g>${twIll('squirrel', 340, 220, .7, true)}${twKids(14, 220, .6)}
     <g id="gdBtns"></g>`;
   let step = 0, busy = false;
   const order = shuffle(STEPS.map((s, i) => i));
   order.forEach((si, j) => {
-    const g = c.mk('g', { class: 'gd-btn', transform: `translate(${80 + j * 80} 268)`, style: 'cursor:pointer' }, c.$('#gdBtns'));
-    g.innerHTML = `<rect x="-28" y="-24" width="56" height="48" rx="12" fill="#fff" stroke="${TW_O}" stroke-width="2.4"/><g transform="scale(1.05)">${TW_ICON[STEPS[si][0]]}</g>`;
+    const g = c.mk('g', { class: 'gd-btn', transform: `translate(${62 + j * 92} 262)`, style: 'cursor:pointer' }, c.$('#gdBtns'));
+    g.innerHTML = `<rect x="-40" y="-34" width="80" height="68" rx="14" fill="#fff" stroke="${TW_O}" stroke-width="2.6"/><g transform="scale(1.7)">${TW_ICON[STEPS[si][0]]}</g>`;
     c.on(g, 'click', async () => {
       if (busy || g.classList.contains('used')) return; c.noHand();
       if (si !== step) { Sound.fx.wrong(); g.classList.remove('no'); void g.getBoundingClientRect(); g.classList.add('no'); c.nag('tw_gd_no'); return; }
@@ -6196,65 +6199,63 @@ function twStore(c) {
   const ITEMS = ['milk', 'bread', 'banana', 'eggs', 'cheese', 'apple'];
   const list = shuffle(ITEMS.slice()).slice(0, 3); const got = new Set(); let paying = false, coins = 0;
   c.svg.innerHTML = `<rect width="400" height="300" fill="#eafbe6"/>${[0, 1, 2, 3, 4, 5, 6, 7].map(i => `<path d="M${i * 52 - 4} 0 L${i * 52 + 48} 0 L${i * 52 + 48} 22 Q${i * 52 + 22} 34 ${i * 52 - 4} 22Z" fill="${i % 2 ? '#fff' : '#45c46a'}" stroke="${TW_O}" stroke-width="1.6"/>`).join('')}
-    <rect x="120" y="44" width="270" height="150" rx="6" fill="#e8c9a0" stroke="${TW_O}" stroke-width="2.4"/><rect x="124" y="114" width="262" height="8" fill="#c08a5a"/><rect x="124" y="184" width="262" height="8" fill="#c08a5a"/>
-    <g id="stItems"></g>
-    <g transform="translate(14 46)"><rect width="96" height="132" rx="6" fill="#fff" stroke="${TW_O}" stroke-width="2.4"/><text x="48" y="22" text-anchor="middle" class="tw-lbl big">Shopping list</text><g id="stList"></g></g>
-    <rect y="214" width="400" height="86" fill="#d9a77a"/><rect x="214" y="206" width="186" height="20" rx="4" fill="#9aa0ab" stroke="${TW_O}" stroke-width="2.2"/>
-    ${twIll('raccoon', 330, 214, .66, true)}${twKids(10, 300, .62)}
-    <g transform="translate(176 246)"><path d="M-32 -18 L32 -18 L26 18 L-26 18Z" fill="#ff9a3d" stroke="${TW_O}" stroke-width="2.4" stroke-linejoin="round"/><path d="M-26 -18 Q0 -46 26 -18" fill="none" stroke="${TW_O}" stroke-width="3"/></g><g id="stBasket"></g><g id="stCoins"></g>`;
-  c.$('#stList').innerHTML = list.map((it, i) => `<g class="st-row" data-it="${it}" transform="translate(0 ${48 + i * 34})"><g transform="translate(30 0) scale(.9)">${TW_ICON[it]}</g><rect x="56" y="-10" width="20" height="20" rx="5" fill="#fff" stroke="${TW_O}" stroke-width="2"/><path class="st-tick" d="M60 0 L65 5 L73 -6" fill="none" stroke="#3fbf6a" stroke-width="3.4" stroke-linecap="round" opacity="0"/></g>`).join('');
+    <rect x="120" y="36" width="272" height="168" rx="6" fill="#e8c9a0" stroke="${TW_O}" stroke-width="2.4"/><rect x="124" y="114" width="264" height="8" fill="#c08a5a"/><rect x="124" y="194" width="264" height="8" fill="#c08a5a"/>
+    <g transform="translate(10 42)"><rect width="102" height="150" rx="8" fill="#fff" stroke="${TW_O}" stroke-width="2.4"/><text x="51" y="22" text-anchor="middle" class="tw-lbl big">Shopping list</text><g id="stList"></g></g>
+    <rect y="214" width="400" height="86" fill="#d9a77a"/><rect x="226" y="206" width="174" height="20" rx="4" fill="#9aa0ab" stroke="${TW_O}" stroke-width="2.2"/>
+    ${twIll('raccoon', 358, 298, .62, true)}<g id="stBasket"><g transform="translate(286 254)"><path d="M-26 -14 L26 -14 L21 14 L-21 14Z" fill="#ff9a3d" stroke="${TW_O}" stroke-width="2.4" stroke-linejoin="round"/><path d="M-21 -14 Q0 -38 21 -14" fill="none" stroke="${TW_O}" stroke-width="3"/></g></g>
+    <g id="stItems"></g><g id="stCoins"></g>`;
+  c.$('#stList').innerHTML = list.map((it, i) => `<g class="st-row" data-it="${it}" transform="translate(0 ${54 + i * 40})"><g transform="translate(32 0) scale(1.1)">${TW_ICON[it]}</g><rect x="62" y="-12" width="24" height="24" rx="6" fill="#fff" stroke="${TW_O}" stroke-width="2"/><path class="st-tick" d="M67 0 L72 6 L82 -7" fill="none" stroke="#3fbf6a" stroke-width="3.6" stroke-linecap="round" opacity="0"/></g>`).join('');
   shuffle(ITEMS.slice()).forEach((it, i) => {
-    const x = 160 + (i % 3) * 84, y = 92 + Math.floor(i / 3) * 70;
-    const g = c.mk('g', { transform: `translate(${x} ${y})`, style: 'cursor:pointer' }, c.$('#stItems')); g.innerHTML = `<circle r="26" fill="transparent"/><g transform="scale(1.3)">${TW_ICON[it]}</g>`;
+    const x = 166 + (i % 3) * 88, y = 80 + Math.floor(i / 3) * 80;
+    const g = c.mk('g', { transform: `translate(${x} ${y})`, style: 'cursor:pointer' }, c.$('#stItems')); g.innerHTML = `<circle r="36" fill="transparent"/><g transform="scale(1.85)">${TW_ICON[it]}</g>`;
     c.on(g, 'click', async () => {
       if (paying || got.has(it)) return; c.noHand();
       if (!list.includes(it)) { Sound.fx.wrong(); c.nag('tw_gr_no'); return; }
       got.add(it); Sound.fx.place(); c.say('tw_it_' + it);
-      const sx = x, sy = y; await c.tween(k => g.setAttribute('transform', `translate(${sx + (176 - sx) * k} ${sy + (236 - sy) * k - Math.sin(k * Math.PI) * 40}) scale(${1 - .4 * k})`), 500);
-      c.$('#stBasket').appendChild(g); g.setAttribute('transform', `translate(${160 + got.size * 9} ${232}) scale(.6)`);
+      const sx = x, sy = y; await c.tween(k => g.setAttribute('transform', `translate(${sx + (286 - sx) * k} ${sy + (246 - sy) * k - Math.sin(k * Math.PI) * 30}) scale(${1 - .6 * k})`), 500);
+      c.$('#stBasket').appendChild(g); g.setAttribute('transform', `translate(${272 + got.size * 8} ${244}) scale(.42)`);
       c.$(`.st-row[data-it="${it}"] .st-tick`).setAttribute('opacity', 1);
       if (got.size === list.length) { paying = true; await c.wait(700); payTime(); }
     });
   });
   function payTime() {
-    c.say('tw_gr_pay'); c.hand(40, 268);
+    c.say('tw_gr_pay'); c.hand(34, 266);
     for (let i = 0; i < 6; i++) {
-      const g = c.mk('g', {}, c.$('#stCoins')); g.innerHTML = `<circle r="16" fill="transparent"/>${TW_ICON.coin}`;
-      c.dragItem(g, 30 + i * 28, 280, async (x, y) => {
-        if (coins >= 4 || x < 210 || y > 236 || y < 150) return false;
-        coins++; g.setAttribute('transform', `translate(${236 + coins * 22} 204)`); Sound.fx.count ? Sound.fx.count(coins) : Sound.fx.place(); c.say('n_' + coins);
+      const g = c.mk('g', {}, c.$('#stCoins')); g.innerHTML = `<circle r="15" fill="transparent"/>${TW_ICON.coin}`;
+      c.dragItem(g, 30 + i * 36, 262, async (x, y) => {
+        if (coins >= 4 || x < 200 || y > 250 || y < 120) return false;
+        coins++; g.setAttribute('transform', `translate(${270 + coins * 24} 216) scale(1.3)`); Sound.fx.place(); c.say('n_' + coins);
         if (coins === 4) c.later(() => c.finish(['tw_gr_3']), 1000);
         return true;
-      });
+      }, { scale: 1.8 });
     }
   }
-  c.hand(160, 92);
+  c.hand(166, 80);
   c.intro(['tw_gr_1', 'tw_gr_2']);
 }
 
 // ---------- 6. Park: recycling, compost or trash ----------
 function twPark(c) {
   const STUFF = [['bottle', 'rec'], ['can', 'rec'], ['paper', 'rec'], ['peel', 'com'], ['core', 'com'], ['chips', 'tra']];
-  const BIN = { rec: [90, '#4a8bff', 'Recycle'], com: [200, '#45c46a', 'Compost'], tra: [310, '#8d939e', 'Trash'] };
-  c.svg.innerHTML = `${SCENE_BG.park.replace('<rect width="400" height="300"', '<rect width="400" height="300"')}
-    ${twKids(296, 170, .6)}
-    ${Object.entries(BIN).map(([k, [x, col, nm]]) => `<g transform="translate(${x} 248)"><path d="M-32 -30 L32 -30 L26 36 L-26 36Z" fill="${col}" stroke="${TW_O}" stroke-width="2.4" stroke-linejoin="round"/><rect x="-36" y="-38" width="72" height="10" rx="4" fill="${col}" stroke="${TW_O}" stroke-width="2.4"/>
+  const BIN = { rec: [76, '#4a8bff', 'Recycle'], com: [200, '#45c46a', 'Compost'], tra: [324, '#8d939e', 'Trash'] };
+  c.svg.innerHTML = `${SCENE_BG.park}${twKids(308, 150, .5)}
+    ${Object.entries(BIN).map(([k, [x, col, nm]]) => `<g transform="translate(${x} 248) scale(1.25)"><path d="M-32 -30 L32 -30 L26 36 L-26 36Z" fill="${col}" stroke="${TW_O}" stroke-width="2.4" stroke-linejoin="round"/><rect x="-36" y="-38" width="72" height="10" rx="4" fill="${col}" stroke="${TW_O}" stroke-width="2.4"/>
       ${k === 'rec' ? `<path d="M-8 -4 L0 -16 L8 -4 M10 2 L4 14 L-10 14 M-12 6 L-16 -2" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>` : k === 'com' ? `<path d="M-10 10 Q-12 -12 12 -14 Q12 10 -10 10Z" fill="#a8e07a" stroke="#fff" stroke-width="2.4"/>` : `<path d="M-8 -10 L8 -10 M-6 -10 L-5 12 L5 12 L6 -10 M-2 -14 L2 -14" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>`}
       <text y="30" text-anchor="middle" class="tw-lbl wh">${nm}</text></g>`).join('')}
     <g id="pkStuff"></g>`;
   const said = new Set(); let done = 0;
-  const spots = shuffle([[40, 150], [130, 168], [210, 150], [70, 196], [250, 186], [160, 130]]);
+  const spots = shuffle([[40, 126], [116, 158], [196, 128], [272, 168], [56, 176], [168, 178]]);
   STUFF.forEach(([it, bin], i) => {
-    const g = c.mk('g', {}, c.$('#pkStuff')); g.innerHTML = `<circle r="20" fill="transparent"/><g transform="rotate(${(i % 3 - 1) * 18})">${TW_ICON[it]}</g>`;
+    const g = c.mk('g', {}, c.$('#pkStuff')); g.innerHTML = `<circle r="22" fill="transparent"/><g transform="rotate(${(i % 3 - 1) * 18})">${TW_ICON[it]}</g>`;
     c.dragItem(g, spots[i][0], spots[i][1], async (x, y) => {
-      const hit = Object.entries(BIN).find(([, [bx]]) => Math.abs(x - bx) < 40 && y > 200); if (!hit) return false;
+      const hit = Object.entries(BIN).find(([, [bx]]) => Math.abs(x - bx) < 58 && y > 196); if (!hit) return false;
       if (hit[0] !== bin) { Sound.fx.wrong(); c.nag('tw_pk_no'); return false; }
-      const bx = hit[1][0]; await c.tween(k => g.setAttribute('transform', `translate(${x + (bx - x) * k} ${y + (226 - y) * k}) scale(${1 - .6 * k})`), 260); g.remove();
-      Sound.fx.pop ? Sound.fx.pop() : Sound.fx.place(); done++;
+      const bx = hit[1][0]; await c.tween(k => g.setAttribute('transform', `translate(${x + (bx - x) * k} ${y + (226 - y) * k}) scale(${1.6 - 1.1 * k})`), 260); g.remove();
+      Sound.fx.pop(); done++;
       if (done === STUFF.length) { c.finish([...(said.has(bin) ? [] : ['tw_pk_' + bin]), 'tw_pk_3']); return true; }
       if (!said.has(bin)) { said.add(bin); c.say('tw_pk_' + bin); } else c.say(praiseId());
       return true;
-    });
+    }, { scale: 1.6 });
   });
   c.hand(spots[0][0], spots[0][1]);
   c.intro(['tw_pk_1', 'tw_pk_2']);
@@ -6271,7 +6272,7 @@ function twCross(c) {
       <g id="cwWalk" opacity="0"><circle cx="0" cy="-92" r="3" fill="#fff"/><path d="M0 -88 L-1 -79 M-1 -79 L-5 -72 M-1 -79 L4 -72 M-1 -86 L-6 -82 M0 -86 L5 -83" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></g></g>
     ${twIll('duck', 112, 262, .7)}<g transform="translate(86 196)"><rect x="-2" y="0" width="4" height="40" fill="#9aa0ab"/><path d="M-14 -14 L-6 -20 L6 -20 L14 -14 L14 -2 L6 4 L-6 4 L-14 -2Z" fill="#e8413c" stroke="${TW_O}" stroke-width="2"/><text y="-4" text-anchor="middle" class="tw-lbl wh">STOP</text></g>
     <g id="cwKids" transform="translate(150 290)">${twKids(0, 0, .62)}</g><g id="cwCars"></g>
-    <g id="cwGo" transform="translate(352 262)" style="cursor:pointer"><circle r="30" fill="#3fbf6a" stroke="${TW_O}" stroke-width="2.6"/><text y="9" text-anchor="middle" class="tw-num wh">GO</text></g>`;
+    <g id="cwGo" transform="translate(344 256)" style="cursor:pointer"><circle r="40" fill="#3fbf6a" stroke="${TW_O}" stroke-width="3"/><text y="11" text-anchor="middle" class="tw-num wh lg">GO</text></g>`;
   let walk = false, crossings = 0, busy = false, lookSaid = false, goSaid = false, carT = 0;
   const cars = c.$('#cwCars');
   function signal(on) { walk = on; c.$('#cwHand').setAttribute('opacity', on ? 0 : 1); c.$('#cwWalk').setAttribute('opacity', on ? 1 : 0); c.$('#cwGo').classList.toggle('cw-ready', on); }
@@ -6297,7 +6298,7 @@ function twCross(c) {
     if (crossings === 3) { c.finish(['tw_cw_3']); return; }
     c.say(praiseId()); k0.setAttribute('transform', 'translate(150 290)'); busy = false; cycle();
   });
-  c.hand(352, 262);
+  c.hand(344, 256);
   c.intro(['tw_cw_1', 'tw_cw_2']).then(() => { if (!busy && crossings === 0) cycle(); });
 }
 
@@ -6309,12 +6310,12 @@ function twVet(c) {
     <path d="M59 52 L59 84 M43 68 L75 68" stroke="#ff5a7a" stroke-width="8" stroke-linecap="round"/><rect y="226" width="400" height="74" fill="#cfe3f0"/>
     <rect x="110" y="176" width="190" height="16" rx="6" fill="#fff" stroke="${TW_O}" stroke-width="2.4"/><rect x="124" y="192" width="10" height="44" fill="#9aa0ab"/><rect x="276" y="192" width="10" height="44" fill="#9aa0ab"/>
     <g id="vtCoop">${twIll('cooper', 206, 182, 1.15)}</g><g id="vtFx"></g>
-    ${twIll('grandpa', 348, 238, .8, true)}${twIll('ellie', 50, 252, .8)}${twIll('zoey', 84, 252, .8)}
+    ${twIll('grandpa', 362, 226, .72, true)}${twIll('ellie', 36, 226, .7)}${twIll('zoey', 70, 226, .7)}
     <g id="vtTools"></g>`;
   let step = 0, busy = false, rub = 0;
   const coop = c.$('#vtCoop'), fx = c.$('#vtFx');
-  const btns = TOOLS.map(([ic], i) => { const g = c.mk('g', { class: 'vt-tool', transform: `translate(${130 + i * 58} 262)`, style: 'cursor:pointer' }, c.$('#vtTools'));
-    g.innerHTML = `<rect x="-24" y="-22" width="48" height="44" rx="10" fill="#fff" stroke="${TW_O}" stroke-width="2.2"/>${TW_ICON[ic]}`; return g; });
+  const btns = TOOLS.map(([ic], i) => { const g = c.mk('g', { class: 'vt-tool', transform: `translate(${62 + i * 92} 264)`, style: 'cursor:pointer' }, c.$('#vtTools'));
+    g.innerHTML = `<rect x="-40" y="-32" width="80" height="64" rx="14" fill="#fff" stroke="${TW_O}" stroke-width="2.6"/><g transform="scale(1.6)">${TW_ICON[ic]}</g>`; return g; });
   function glow() { btns.forEach((b, i) => b.classList.toggle('vt-now', i === step)); }
   async function done(i) {
     busy = true; btns[i].classList.add('used'); const line = TOOLS[i][2];
@@ -6327,11 +6328,11 @@ function twVet(c) {
     c.noHand();
     if (i === 0) { busy = true; for (let k = 0; k < 3; k++) { const h = c.mk('g', { transform: 'translate(190 140)', class: 'vt-beat' }, fx); h.innerHTML = TW_ICON.heart; Sound.fx.drum ? Sound.fx.drum() : Sound.fx.tap(); await c.wait(520); h.remove(); } done(0); }
     if (i === 1) { busy = true; const s = c.mk('g', { transform: 'translate(206 170)' }, fx); s.innerHTML = `<g transform="scale(1.6)">${TW_ICON.scale}</g>`; coop.setAttribute('transform', 'translate(0 -14)'); Sound.fx.boing(); await c.wait(1200); s.remove(); coop.removeAttribute('transform'); done(1); }
-    if (i === 2) { busy = true; const br = c.mk('g', {}, svg_top(c)); br.innerHTML = `<circle r="22" fill="transparent"/><g transform="scale(1.3)">${TW_ICON.brush}</g>`; let lx = null, ly = null;
-      c.dragItem(br, 84, 150, async () => false); busy = false; c.hand(84, 150);
+    if (i === 2) { busy = true; const br = c.mk('g', {}, svg_top(c)); br.innerHTML = `<circle r="20" fill="transparent"/>${TW_ICON.brush}`; let lx = null, ly = null;
+      c.dragItem(br, 70, 140, async () => false, { scale: 1.9 }); busy = false; c.hand(70, 140);
       c.drag(br, { move: ([x, y]) => { if (lx != null && Math.abs(x - 200) < 70 && y > 90 && y < 190) { rub += Math.hypot(x - lx, y - ly); if (Math.random() < .2) c.spark(x, y, 3); if (Math.random() < .12) Sound.fx.crayon(); } lx = x; ly = y;
           if (rub > 420 && step === 2 && !busy) { br.remove(); done(2); } } }); }
-    if (i === 3) { busy = true; const bn = c.mk('g', { transform: 'translate(304 262)' }, fx); bn.innerHTML = TW_ICON.bone; await c.tween(k => bn.setAttribute('transform', `translate(${304 - 70 * k} ${262 - 110 * k - Math.sin(k * Math.PI) * 30})`), 700); bn.remove();
+    if (i === 3) { busy = true; const bn = c.mk('g', { transform: 'translate(338 264)' }, fx); bn.innerHTML = TW_ICON.bone; await c.tween(k => bn.setAttribute('transform', `translate(${338 - 104 * k} ${264 - 112 * k - Math.sin(k * Math.PI) * 30}) scale(${1.6 - .4 * k})`), 700); bn.remove();
       Sound.fx.woof ? Sound.fx.woof() : Sound.fx.chirp(); coop.classList.add('vt-happy'); c.spark(230, 120, 8); c.finish(['tw_vt_3']); }
   }));
   glow(); c.hand(130, 262);
