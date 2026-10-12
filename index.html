@@ -6400,6 +6400,8 @@ function doctorGame(root, api) {
   let tok = 0, cleanups = [];
   const prog = store.get('pr-doctor', { done: {}, seen: false });
   const save = () => store.set('pr-doctor', prog);
+  // a finished checkup starts over fresh next time (also tidies up anyone saved before this rule)
+  if (prog.done.treat) { prog.done = {}; prog.fresh = true; save(); }
   function stop() { tok++; cleanups.forEach(f => { try { f(); } catch (e) {} }); cleanups = []; Sound.stopVoice(); }
   function stage(cls) {
     box.innerHTML = `<div class="sci-wrap"><div class="sci-stage tw-stage ${cls}"><svg class="sci-svg tw-svg" viewBox="0 0 400 300"></svg><svg class="sci-hand" viewBox="0 0 400 300"><text class="hand" x="0" y="0">👆</text></svg></div></div>`;
@@ -6418,8 +6420,8 @@ function doctorGame(root, api) {
           <rect x="117" y="5" width="23" height="23" rx="5" fill="#fff" stroke="${TW_O}" stroke-width="1.8"/>${prog.done[s.id] ? `<path d="M121 16 L127 23 L136 10" fill="none" stroke="#3fbf6a" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>` : ''}</g>`; }).join('')}</g>`;
     svg.querySelectorAll('.dr-row').forEach(g => g.addEventListener('click', () => { if (g.classList.contains('locked')) return; Sound.fx.tap(); play(DR_STEPS[+g.dataset.i]); }));
     let say = line;
-    if (!prog.seen) { prog.seen = true; save(); say = 'dr_intro'; }
-    else if (!say) say = prog.done.treat ? 'dr_again' : nDone ? 'dr_back' : 'dr_list';
+    if (!prog.seen || prog.fresh) { prog.seen = true; prog.fresh = false; save(); say = 'dr_intro'; }
+    else if (!say) say = nDone ? 'dr_back' : 'dr_list';
     introIds = [say]; Sound.say(say);
   }
   function play(s) {
@@ -6456,7 +6458,8 @@ function doctorGame(root, api) {
       spark(x, y, n = 6) { for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, e = sciMk('circle', { cx: x + Math.cos(a) * 26, cy: y + Math.sin(a) * 20, r: 4, fill: '#fff6a0', class: 'fs-spark' }, svg); setTimeout(() => e.remove(), 900); } },
       async finish(lines) {
         if (finished) return; finished = true; c.noHand();
-        prog.done[s.id] = true; save();
+        if (s.id === 'treat') { prog.done = {}; prog.fresh = true; } else prog.done[s.id] = true;
+        save();
         await c.say(lines); if (!alive()) return;
         if (s.id !== 'treat') { await c.say(pick(['dr_next1', 'dr_next2'])); if (!alive()) return; }
         api.win();
@@ -6584,7 +6587,7 @@ function drEars(c) {
       Sound.fx.magic(); const zm = c.$('#eaZoom'); zm.setAttribute('opacity', 1); await c.wait(1500); zm.setAttribute('opacity', 0);
       done++; c.$('#ea' + side).style.display = 'none';
       if (done === 2) { c.finish(['dr_ea_3']); return true; }
-      side = 'R'; c.$('#eaR').style.display = ''; await c.say('dr_ea_2'); arm(); c.hand(342, 148); return true;
+      side = 'R'; c.$('#eaR').style.display = ''; arm(); c.hand(342, 148); c.say('dr_ea_2'); return true;
     }, { scale: 1.6 });
   }
   arm(); c.hand(342, 148);
@@ -6784,7 +6787,7 @@ const GAMES = [
   { id: 'pop', name: 'Balloon Pop', art: TILE_ART.pop, bg: 'var(--t7)', start: popGame, clips: () => ['pop_intro', 'try0', ...PRAISE] },
   { id: 'puzzle', name: 'Photo Puzzle', art: TILE_ART.puzzle, bg: 'var(--t8)', start: puzzleGame, clips: () => ['puz_intro', ...PRAISE] },
   { id: 'town', name: 'Town Helpers', art: TILE_ART.town, bg: '#ff9f5a', tight: true, start: townGame, clips: () => ['tw_intro', 'tw_map', 'tw_back', 'tw_again'] },
-  { id: 'doctor', name: 'At the Doctor', art: TILE_ART.doctor, bg: '#5cc6c0', tight: true, start: doctorGame, clips: () => ['dr_intro', 'dr_list', 'dr_back', 'dr_again'] },
+  { id: 'doctor', name: 'At the Doctor', art: TILE_ART.doctor, bg: '#5cc6c0', tight: true, start: doctorGame, clips: () => ['dr_intro', 'dr_list', 'dr_back'] },
   { id: 'piano', name: 'Piano Songs', art: TILE_ART.piano, bg: '#7b5cff', tight: true, start: pianoGame, clips: () => ['mu_intro', 'mu_turn', 'mu_free', 'mu_try', 'mu_listen'] },
   { id: 'paint', name: 'Paint', art: TILE_ART.paint, bg: 'var(--t9)', start: paintGame, clips: () => ['paint_intro', 'paint_fill', 'paint_brush', 'paint_erase', 'paint_done', ...PAINTS.map(p => 'c_' + p[0]), ...ART.ids.map(i => 'pt_' + i)] },
 ];
