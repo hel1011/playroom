@@ -20,6 +20,7 @@ WHAT'S INSIDE
 • Science Lab: 28 hands-on experiments, from volcanoes, magnets and rainbows to fossils, bees, the solar system and how vaccines help your body.
 • Town Helpers: join sisters Ellie and Zoey and their dog Cooper as they help eight neighbors around town, counting, matching numbers, sounding out letters, planting, shopping, recycling, crossing the street safely and caring for a pet. Progress is saved along the way.
 • At the Doctor: go through Zoey's checkup step by step: weighing, measuring, an eye test, a hearing test, an ear check and a shot, then a sticker and a lollipop. A gentle way to get ready for a real visit.
+• What Should You Do?: 21 everyday situations, like sharing, staying safe, healthy snacks and big feelings. Pip reads each answer aloud and lights it up, so kids who can't read yet can choose on their own.
 • Piano Songs: play six favorite songs on a color-coded piano by following the glowing keys, or make up your own music.
 • Trace It: trace capital letters, lowercase letters and numbers.
 • Count With Me, Add & Take Away and Dot-to-Dot for early math.
