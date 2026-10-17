@@ -7679,6 +7679,18 @@ function hideGame(root, api) {
   const wait = ms => new Promise(r => later(r, ms));
   const say = ids => { const my = tok; return Sound.say(ids).then(() => my === tok && box.isConnected); };
   const spotEl = id => box.querySelector(`.hs-spot[data-id="${id}"]`);
+  const isClue = id => id.startsWith('hs_c_') || id.startsWith('hs_s_');
+  let clueBusy = false, waitNo = null, waitClues = [];
+  function speak(ids) {
+    ids = [].concat(ids);
+    if (clueBusy) { ids.forEach(id => { if (isClue(id) || id === 'hs_more') waitClues.push(id); else waitNo = id; }); return; }
+    const my = tok, hasClue = ids.some(isClue); if (hasClue) clueBusy = true;
+    Sound.say(ids).then(() => {
+      if (!hasClue || my !== tok) return; clueBusy = false;
+      const next = [waitNo, ...waitClues].filter(Boolean); waitNo = null; waitClues = [];
+      if (next.length && box.isConnected) speak(next);
+    });
+  }
   const svgOf = r => box.querySelectorAll('.hs-svg')[r];
   function setRoom(r, quiet) {
     if (r === room) return; room = r; visited[r] = true; track.style.transform = `translateX(${-50 * r}%)`;
@@ -7701,7 +7713,7 @@ function hideGame(root, api) {
   }
   function drawClues() {
     cluesEl.innerHTML = clues.slice(0, given).map((id, i) => `<button class="hs-clue${i === given - 1 ? ' new' : ''}" type="button" data-id="${id}">${clueIcon(id)}<span class="hs-ct">${TEXT[id] || ''}</span></button>`).join('');
-    cluesEl.querySelectorAll('.hs-clue').forEach(b => b.addEventListener('click', () => { Sound.fx.tap(); Sound.say(b.dataset.id); }));
+    cluesEl.querySelectorAll('.hs-clue').forEach(b => b.addEventListener('click', () => { Sound.fx.tap(); if (!clueBusy) speak(b.dataset.id); }));
     introIds = clues.slice(0, given);
   }
   async function newRound() {
@@ -7718,7 +7730,7 @@ function hideGame(root, api) {
     countEl.classList.add('gone');
     for (let n = 1; n <= 10; n++) { num.textContent = n; num.classList.remove('tick'); void num.offsetWidth; num.classList.add('tick'); Sound.fx.count(Math.min(9, n - 1)); await wait(650); if (!box.isConnected) return; }
     countEl.hidden = true; busy = false; given = 1; drawClues();
-    say(['hs_ready', clues[0]]);
+    speak(['hs_ready', clues[0]]);
   }
   async function tapSpot(s, g) {
     if (busy || found || g.classList.contains('looked')) return;
@@ -7733,13 +7745,13 @@ function hideGame(root, api) {
       if (given < clues.length) { lines.push('hs_more', clues[given]); given++; drawClues(); }
       else if (!peeked) { peeked = true; peek(); lines.push('hs_peek'); }
     }
-    say(lines);
+    speak(lines);
   }
   function peek() {   // Pip's tail feathers poke out of the hiding spot and wiggle
     const fx = svgOf(target.room).querySelector('.hs-fx'), g = sciMk('g', { transform: `translate(${target.pop[0] + 14} ${target.pop[1] - 6})`, class: 'hs-peek' }, fx); g.innerHTML = HS_TAIL;
   }
   async function foundIt(s, g) {
-    found = true; busy = true; g.classList.add('hs-found');
+    found = true; busy = true; clueBusy = false; waitNo = null; waitClues = []; g.classList.add('hs-found');
     const fx = svgOf(s.room).querySelector('.hs-fx'); fx.querySelectorAll('.hs-peek').forEach(p => p.remove());
     const pg = sciMk('g', { transform: `translate(${s.pop[0]} ${s.pop[1]})` }, fx); pg.innerHTML = `<g class="hs-pop"><g transform="translate(-34 -60) scale(.68)">${PIP_ART}</g></g>`;
     for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, c = sciMk('circle', { cx: s.pop[0] + Math.cos(a) * 46, cy: s.pop[1] - 26 + Math.sin(a) * 38, r: 5, fill: ['#ffd23f', '#ff7aa8', '#7cc8ff', '#7ad67f'][i % 4], class: 'fs-spark' }, fx); setTimeout(() => c.remove(), 900); }
