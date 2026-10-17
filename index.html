@@ -5412,24 +5412,35 @@ function sciLever(c) {
 
 // ---------- 16. Friction ----------
 function sciFriction(c) {
-  const SURF = { ice: ['#cfeeff', 135, 'Ice'], wood: ['#d9a066', 225, 'Wood'], carpet: ['#d9534f', 560, 'Carpet'] };
-  c.svg.innerHTML = `<rect width="400" height="300" fill="#fff3e2"/><rect y="252" width="400" height="48" fill="#e8dccb"/>
-    <path d="M14 112 L130 230 L14 230Z" fill="#b9733a" stroke="${SCI_O}" stroke-width="2.4" stroke-linejoin="round"/><path d="M14 112 L130 230" stroke="#8a5a32" stroke-width="5"/>
-    <g id="frFloor"></g><g id="frFlags"></g>
-    <g id="frCar" style="cursor:pointer"><circle r="24" cy="-8" fill="transparent"/><rect x="-18" y="-16" width="36" height="12" rx="4" fill="#4ab3ff" stroke="${SCI_O}" stroke-width="2"/><path d="M-10 -16 L-6 -24 L8 -24 L12 -16Z" fill="#bfe9ff" stroke="${SCI_O}" stroke-width="2"/>
-      <g class="frw" transform="translate(-10 -3)"><circle r="5.5" fill="${SCI_O}"/><path d="M-4 0 L4 0" stroke="#c8ccd4" stroke-width="2"/></g><g class="frw" transform="translate(10 -3)"><circle r="5.5" fill="${SCI_O}"/><path d="M-4 0 L4 0" stroke="#c8ccd4" stroke-width="2"/></g></g>
+  // stopping force for each floor: carpet grabs the wheels, wood a little, ice hardly at all
+  const SURF = { ice: ['#cfeeff', 60, 'Ice'], wood: ['#d9a066', 225, 'Wood'], carpet: ['#d9534f', 650, 'Carpet'] };
+  const END = 1180, MAPX = 20, MAPW = 360, mx = x => MAPX + x / END * MAPW;   // the floor runs far past the screen; the little map shows all of it
+  c.svg.innerHTML = `<rect width="400" height="300" fill="#fff3e2"/>
+    <g id="frWorld"><g id="frWall">${[...Array(21)].map((_, i) => `<rect x="${i * 60}" y="0" width="30" height="252" fill="#fbe9d2"/>`).join('')}</g>
+      <rect x="-10" y="252" width="${END + 40}" height="48" fill="#e8dccb"/>
+      ${[...Array(10)].map((_, i) => { const x = 130 + (i + 1) * 100; return `<g transform="translate(${x} 150)"><rect x="-14" y="-14" width="28" height="28" rx="6" fill="#fff" stroke="${SCI_O}" stroke-width="2"/><text y="7" text-anchor="middle" class="sci-lbl big">${i + 1}</text><path d="M0 14 V80" stroke="#c8b8a0" stroke-width="3"/></g>`; }).join('')}
+      <rect x="${END}" y="170" width="16" height="82" rx="3" fill="#8a5a32" stroke="${SCI_O}" stroke-width="2.4"/>
+      <path d="M14 112 L130 230 L14 230Z" fill="#b9733a" stroke="${SCI_O}" stroke-width="2.4" stroke-linejoin="round"/><path d="M14 112 L130 230" stroke="#8a5a32" stroke-width="5"/>
+      <g id="frFloor"></g><g id="frFlags"></g>
+      <g id="frCar" style="cursor:pointer"><circle r="24" cy="-8" fill="transparent"/><rect x="-18" y="-16" width="36" height="12" rx="4" fill="#4ab3ff" stroke="${SCI_O}" stroke-width="2"/><path d="M-10 -16 L-6 -24 L8 -24 L12 -16Z" fill="#bfe9ff" stroke="${SCI_O}" stroke-width="2"/>
+        <g class="frw" transform="translate(-10 -3)"><circle r="5.5" fill="${SCI_O}"/><path d="M-4 0 L4 0" stroke="#c8ccd4" stroke-width="2"/></g><g class="frw" transform="translate(10 -3)"><circle r="5.5" fill="${SCI_O}"/><path d="M-4 0 L4 0" stroke="#c8ccd4" stroke-width="2"/></g></g></g>
+    <g id="frMap"><rect x="${MAPX - 6}" y="54" width="${MAPW + 12}" height="30" rx="10" fill="#fff" stroke="${SCI_O}" stroke-width="2" opacity=".92"/><path d="M${mx(130)} 74 H${mx(END)}" stroke="#c8b8a0" stroke-width="4" stroke-linecap="round"/>
+      <path d="M${mx(14)} 64 L${mx(130)} 74" stroke="#b9733a" stroke-width="4" stroke-linecap="round"/><g id="frMapFlags"></g><circle id="frMapCar" cx="${mx(26)}" cy="66" r="5" fill="#4ab3ff" stroke="${SCI_O}" stroke-width="1.6"/></g>
     ${Object.keys(SURF).map((k, i) => `<g class="frBtn" data-s="${k}" style="cursor:pointer"><rect x="${150 + i * 82}" y="14" width="76" height="32" rx="16" fill="#fff" stroke="${SCI_O}" stroke-width="2.4"/><text x="${188 + i * 82}" y="36" text-anchor="middle" class="sci-btn">${['🧊', '🪵', '🧶'][i]} ${SURF[k][2]}</text></g>`).join('')}`;
-  let surf = 'wood', running = false, tried = new Set(), said3 = false, said4 = false, fin = false;
+  let surf = 'wood', running = false, tried = new Set(), said3 = false, said4 = false, fin = false, cam = 0;
+  const world = c.$('#frWorld'), setCam = x => { cam = Math.max(0, Math.min(END + 30 - 400, x)); world.setAttribute('transform', `translate(${-cam.toFixed(1)} 0)`); };
   function floor() {
-    const [col] = SURF[surf], F = c.$('#frFloor');
-    F.innerHTML = `<rect x="130" y="230" width="270" height="22" fill="${col}" stroke="${SCI_O}" stroke-width="2.4"/>` +
-      (surf === 'wood' ? [170, 230, 290, 350].map(x => `<path d="M${x} 230 L${x} 252" stroke="#a87648" stroke-width="2"/>`).join('') : surf === 'ice' ? `<path d="M160 236 L190 236 M250 240 L300 240" stroke="#fff" stroke-width="3" stroke-linecap="round"/>` : [...Array(30)].map((_, i) => `<circle cx="${136 + i * 9}" cy="${236 + (i % 3) * 6}" r="1.8" fill="#a83a36"/>`).join(''));
+    const [col] = SURF[surf], F = c.$('#frFloor'), len = END - 130;
+    F.innerHTML = `<rect x="130" y="230" width="${len}" height="22" fill="${col}" stroke="${SCI_O}" stroke-width="2.4"/>` +
+      (surf === 'wood' ? [...Array(Math.floor(len / 60))].map((_, i) => `<path d="M${170 + i * 60} 230 L${170 + i * 60} 252" stroke="#a87648" stroke-width="2"/>`).join('')
+        : surf === 'ice' ? [...Array(Math.floor(len / 110))].map((_, i) => `<path d="M${160 + i * 110} ${236 + (i % 2) * 4} l30 0" stroke="#fff" stroke-width="3" stroke-linecap="round"/>`).join('')
+        : [...Array(Math.floor(len / 9))].map((_, i) => `<circle cx="${136 + i * 9}" cy="${236 + (i % 3) * 6}" r="1.8" fill="#a83a36"/>`).join(''));
     c.svg.querySelectorAll('.frBtn rect').forEach(r => r.setAttribute('fill', r.parentNode.dataset.s === surf ? '#ffd23f' : '#fff'));
   }
-  const car = c.$('#frCar'), wheels = [...c.svg.querySelectorAll('.frw')];
-  const put = (x, y, rot, wr) => { car.setAttribute('transform', `translate(${x} ${y}) rotate(${rot})`); wheels.forEach((w, i) => w.setAttribute('transform', `translate(${i ? 10 : -10} -3) rotate(${wr})`)); };
+  const car = c.$('#frCar'), wheels = [...c.svg.querySelectorAll('.frw')], mapCar = c.$('#frMapCar');
+  const put = (x, y, rot, wr) => { car.setAttribute('transform', `translate(${x} ${y}) rotate(${rot})`); wheels.forEach((w, i) => w.setAttribute('transform', `translate(${i ? 10 : -10} -3) rotate(${wr})`)); mapCar.setAttribute('cx', mx(x).toFixed(1)); mapCar.setAttribute('cy', (y > 220 ? 70 : 64 + (y - 124) / 104 * 8).toFixed(1)); };
   const reset = () => put(26, 124, 45, 0);
-  floor(); reset(); c.hand(26, 140);
+  floor(); reset(); setCam(0); c.hand(26, 140);
   c.on(c.svg, 'pointerdown', e => {
     const b = e.target.closest && e.target.closest('.frBtn'); if (b && !running) { surf = b.dataset.s; floor(); Sound.fx.tap(); return; }
     if (!running && e.target.closest && e.target.closest('#frCar')) go();
@@ -5439,7 +5450,8 @@ function sciFriction(c) {
     let s = 0, v = 0, x = 26, wr = 0; const a = SURF[surf][1], L = 162;
     c.loop(dt => {
       if (s < L) { v += 330 * dt; s += v * dt; const k = Math.min(1, s / L); x = 26 + 104 * k; put(x, 124 + 104 * k, 45, wr += v * dt * 6); return true; }
-      v = Math.max(0, v - a * dt); x += v * dt; if (x > 388) { x = 388; v = 0; } put(x, 228, 0, wr += v * dt * 6);
+      v = Math.max(0, v - a * dt); x += v * dt; if (x > END - 20) { x = END - 20; v = 0; } put(x, 228, 0, wr += v * dt * 6);
+      setCam(cam + (x - 170 - cam) * Math.min(1, dt * 6));   // the view rolls along with the car
       if (v > 0) return true;
       stopped(x); return false;
     });
@@ -5448,12 +5460,16 @@ function sciFriction(c) {
     Sound.fx.place(); tried.add(surf);
     const F = c.$('#frFlags'), old = F.querySelector(`[data-s="${surf}"]`); if (old) old.remove();
     const g = sciMk('g', { 'data-s': surf }, F); g.innerHTML = `<path d="M${x} 228 L${x} 196" stroke="${SCI_O}" stroke-width="2"/><path d="M${x} 196 L${x + 22} 202 L${x} 208Z" fill="${SCI_TOPIC_COL[surf]}" stroke="${SCI_O}" stroke-width="1.4"/><text x="${x}" y="276" text-anchor="middle" class="sci-lbl">${SURF[surf][2]}</text>`;
+    const MF = c.$('#frMapFlags'), mo = MF.querySelector(`[data-s="${surf}"]`); if (mo) mo.remove();
+    const mg = sciMk('g', { 'data-s': surf }, MF); mg.innerHTML = `<path d="M${mx(x)} 74 V58" stroke="${SCI_O}" stroke-width="1.6"/><path d="M${mx(x)} 58 l11 3 l-11 3Z" fill="${SCI_TOPIC_COL[surf]}" stroke="${SCI_O}" stroke-width="1"/>`;
     const lines = [];
     if (surf === 'carpet' && !said3) { said3 = true; lines.push('sc_fr_3'); }
     if (surf === 'ice' && !said4) { said4 = true; lines.push('sc_fr_4'); }
-    if (tried.size === 3 && !fin) { fin = true; c.later(() => { reset(); }, 900); c.finish(lines); return; }
+    // let the child see where it stopped, then roll the view back to the ramp
+    const back = async () => { await new Promise(r => c.later(r, 1300)); const from = cam; await c.tween(k => setCam(from * (1 - k * k * (3 - 2 * k))), 1100); reset(); };
+    if (tried.size === 3 && !fin) { fin = true; back(); c.finish(lines); return; }
     if (lines.length) c.say(lines);
-    c.later(() => { reset(); running = false; }, 900);
+    await back(); running = false;
   }
   c.intro(['sc_fr_1', 'sc_fr_2']);
 }
