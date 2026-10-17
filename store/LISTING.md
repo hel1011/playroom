@@ -21,6 +21,7 @@ WHAT'S INSIDE
 • Town Helpers: join sisters Ellie and Zoey and their dog Cooper as they help eight neighbors around town, counting, matching numbers, sounding out letters, planting, shopping, recycling, crossing the street safely and caring for a pet. Progress is saved along the way.
 • At the Doctor: go through Zoey's checkup step by step: weighing, measuring, an eye test, a hearing test, an ear check and a shot, then a sticker and a lollipop. A gentle way to get ready for a real visit.
 • What Should You Do?: 36 everyday situations, like sharing, staying safe, healthy snacks and big feelings. Pip reads each answer aloud and lights it up, so kids who can't read yet can choose on their own.
+• Hide and Seek: Pip hides somewhere in a living room or a bedroom. Kids follow his clues, which get more helpful with every wrong guess, until they find him.
 • Piano Songs: play six favorite songs on a color-coded piano by following the glowing keys, or make up your own music.
 • Trace It: trace capital letters, lowercase letters and numbers.
 • Count With Me, Add & Take Away and Dot-to-Dot for early math.
