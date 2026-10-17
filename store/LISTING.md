@@ -17,7 +17,7 @@ Pip's Playhouse is a bright, friendly learning app for little kids, hosted by Pi
 
 WHAT'S INSIDE
 • Story Time: 11 read-along picture books. Words light up as Pip reads, and the answer choices light up as Pip reads each question.
-• Science Lab: 32 hands-on experiments, from volcanoes, magnets and rainbows to firing a cannon, making a tornado, fossils, bees, the solar system and how vaccines help your body.
+• Science Lab: 34 hands-on experiments, from volcanoes, magnets and rainbows to firing a cannon, making a tornado, the phases of the moon, pond life under a microscope, fossils, bees, the solar system and how vaccines help your body.
 • Town Helpers: join sisters Ellie and Zoey and their dog Cooper as they help eight neighbors around town, counting, matching numbers, sounding out letters, planting, shopping, recycling, crossing the street safely and caring for a pet. Progress is saved along the way.
 • At the Doctor: go through Zoey's checkup step by step: weighing, measuring, an eye test, a hearing test, an ear check and a shot, then a sticker and a lollipop. A gentle way to get ready for a real visit.
 • What Should You Do?: 36 everyday situations, like sharing, staying safe, healthy snacks and big feelings. Pip reads each answer aloud and lights it up, so kids who can't read yet can choose on their own.
