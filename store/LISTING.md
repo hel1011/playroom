@@ -23,7 +23,7 @@ WHAT'S INSIDE
 • What Should You Do?: 36 everyday situations, like sharing, staying safe, healthy snacks and big feelings. Pip reads each answer aloud and lights it up, so kids who can't read yet can choose on their own.
 • Hide and Seek: Pip hides somewhere in a living room or a bedroom. Kids follow his clues, which get more helpful with every wrong guess, until they find him.
 • Piano Songs: play six favorite songs on a color-coded piano by following the glowing keys, or make up your own music.
-• Guitar: tap a color on the guitar's neck to pick a chord, then swipe across the strings to strum. Play along with 12 favorite songs, from Twinkle, Twinkle to Jingle Bells, as colored notes slide in, or strum your own music.
+• Guitar: tap a color on the guitar's neck to pick a chord, then swipe across the strings to strum. Play along with 12 favorite songs, from Twinkle, Twinkle to Jingle Bells, as colored notes slide in. Easy uses two or three chords, Hard uses five. Or strum your own music.
 • Trace It: trace capital letters, lowercase letters and numbers.
 • Count With Me, Add & Take Away and Dot-to-Dot for early math.
 • Rhyme Time for early reading.
