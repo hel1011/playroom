@@ -562,9 +562,14 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 @keyframes gtbuzz { 0% { opacity: .95; transform: scaleY(1.3); } 100% { opacity: 0; transform: scaleY(.3); } }
 .gt-phone { background: linear-gradient(#fff 0 58%, #de8f40 58%); }
 .gt > .gt-guitar { flex: 1 1 auto; }
-.gt-keys { position: absolute; z-index: 5; left: 7%; width: 37%; top: 14%; bottom: 14%; display: grid; grid-template-columns: repeat(var(--cols), 1fr); grid-auto-rows: 1fr; gap: 8px; place-items: center; }
+.gt-keys { position: absolute; z-index: 5; left: 7%; width: 33%; top: 14%; bottom: 14%; display: grid; grid-template-columns: repeat(var(--cols), 1fr); grid-auto-rows: 1fr; gap: 8px; place-items: center; }
 @container (max-aspect-ratio: 1/1) { .gt-keys { grid-template-columns: repeat(var(--pcols), 1fr); } }
-.gt-key { width: min(100%, 76px); height: min(100%, 76px); aspect-ratio: 1; border: 4px solid rgba(255,255,255,.85); padding: 0; border-radius: 50%; background: var(--c); color: #fff; display: grid; place-items: center; cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; opacity: .55; box-shadow: inset 0 -6px 0 rgba(0,0,0,.22), inset 0 4px 0 rgba(255,255,255,.35), 0 4px 0 rgba(0,0,0,.3); transition: opacity .1s, transform .1s; }
+/* in a song the few buttons stand in a column at the end of the neck, under the left thumb and well away from the strings you strum */
+.gt-keys.col { left: 6%; width: auto; top: 12%; bottom: 12%; grid-template-columns: repeat(var(--kc), auto); grid-template-rows: repeat(var(--kr), 1fr); grid-auto-rows: auto; gap: 6px 10px; --kc: 1; --kr: var(--n-rows, 3); }
+.gt-keys.col[data-n="1"] { --kr: 1; } .gt-keys.col[data-n="2"] { --kr: 2; } .gt-keys.col[data-n="3"] { --kc: 2; --kr: 2; } .gt-keys.col[data-n="4"] { --kc: 2; --kr: 2; }
+@container (max-aspect-ratio: 1/1) { .gt-keys.col[data-n="3"] { --kc: 1; --kr: 3; } .gt-keys.col[data-n="4"] { --kc: 1; --kr: 4; } }
+.gt-keys.col .gt-key { --s: min(68px, calc((76cqh - (var(--kr) - 1) * 6px) / var(--kr))); width: var(--s); height: var(--s); }
+.gt-key { width: min(100%, 76px); height: min(100%, 76px); aspect-ratio: 1; border: 4px solid rgba(255,255,255,.85); padding: 0; border-radius: 50%; background: var(--c); color: #fff; display: grid; place-items: center; cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; opacity: .72; box-shadow: inset 0 -6px 0 rgba(0,0,0,.22), inset 0 4px 0 rgba(255,255,255,.35), 0 4px 0 rgba(0,0,0,.3); transition: opacity .1s, transform .1s; }
 .gt-key b { font: 800 clamp(16px, 3.8vh, 24px)/1 var(--f-display); text-shadow: 0 1px 0 rgba(0,0,0,.3); pointer-events: none; }
 .gt-key.on { opacity: 1; transform: scale(1.08); box-shadow: inset 0 -6px 0 rgba(0,0,0,.22), inset 0 4px 0 rgba(255,255,255,.35), 0 0 0 4px #fff, 0 0 18px var(--c); }
 .gt-key.want { opacity: 1; animation: gtwant .8s ease-in-out infinite; }
@@ -578,7 +583,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .gt-hand.swipe { display: block; animation: gtswipe 1.6s ease-in-out infinite; }
 @keyframes gttap { 50% { translate: 0 -10px; } }
 @keyframes gtswipe { 0% { translate: 0 0; opacity: 0; } 15% { opacity: 1; } 70% { translate: 0 calc(var(--gh, 200px) * .6); opacity: 1; } 100% { opacity: 0; translate: 0 calc(var(--gh, 200px) * .62); } }
-.gt-track { position: relative; flex: 0 0 auto; height: clamp(72px, 20vh, 96px); border-radius: 18px; overflow: hidden; background: radial-gradient(ellipse at 20% 150%, #5a3a8f, #241a40 65%, #160f29); }
+.gt-track { position: relative; flex: 0 0 auto; touch-action: none; height: clamp(72px, 20vh, 96px); border-radius: 18px; overflow: hidden; background: radial-gradient(ellipse at 20% 150%, #5a3a8f, #241a40 65%, #160f29); }
 .gt-track::before { content: ''; position: absolute; left: 0; right: 0; top: 44%; height: 4px; margin-top: -2px; background: rgba(255,255,255,.18); }
 .gt-target { position: absolute; z-index: 1; left: var(--tx, 60px); top: 44%; width: clamp(44px, 12vh, 58px); aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; border: 4px solid rgba(255,255,255,.85); box-shadow: 0 0 14px rgba(255,255,255,.55); }
 .gt-gems { position: absolute; inset: 0; }
@@ -3421,11 +3426,11 @@ function pianoGame(root, api) {
 // A guitar held sideways. Pick a color chord on the left, then swipe across the strings to strum, or tap one string to pluck it.
 // In a song, Pip holds the chords: every strum plays the next note of the tune over the right chord, so strumming along to the beat plays the song.
 const GT_OPEN = [40, 45, 50, 55, 59, 64];   // the open strings, low E to high E (MIDI note numbers)
-// frets for each string, low E to high E (null = that string isn't played)
+// frets for each string, low E to high E. Every string rings in every chord, so no strum ever comes out as a dead click.
 const GT_CHORDS = {
-  C: { f: [null, 3, 2, 0, 1, 0], c: '#ff5a4e' }, D: { f: [null, null, 0, 2, 3, 2], c: '#ff9f1c' }, E: { f: [0, 2, 2, 1, 0, 0], c: '#ffcf2e' },
-  F: { f: [1, 3, 3, 2, 1, 1], c: '#45c46a' }, G: { f: [3, 2, 0, 0, 0, 3], c: '#28b8c8' }, A: { f: [null, 0, 2, 2, 2, 0], c: '#4a8bff' },
-  Em: { f: [0, 2, 2, 0, 0, 0], c: '#9a6bff' }, Am: { f: [null, 0, 2, 2, 1, 0], c: '#ff6fa8' },
+  C: { f: [0, 3, 2, 0, 1, 0], c: '#ff5a4e' }, D: { f: [2, 0, 0, 2, 3, 2], c: '#ff9f1c' }, E: { f: [0, 2, 2, 1, 0, 0], c: '#ffcf2e' },
+  F: { f: [1, 3, 3, 2, 1, 1], c: '#45c46a' }, G: { f: [3, 2, 0, 0, 0, 3], c: '#28b8c8' }, A: { f: [0, 0, 2, 2, 2, 0], c: '#4a8bff' },
+  Em: { f: [0, 2, 2, 0, 0, 0], c: '#9a6bff' }, Am: { f: [0, 0, 2, 2, 1, 0], c: '#ff6fa8' },
 };
 const gtMidiF = m => 440 * Math.pow(2, (m - 69) / 12);
 const gtNoteMidi = n => { const m = /^([A-G])(#?)(\d)$/.exec(n); return { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] ? 1 : 0) + (+m[3] + 1) * 12; };
@@ -3529,7 +3534,7 @@ function guitarGame(root, api) {
     const cols = keys.length > 4 ? Math.ceil(keys.length / 2) : keys.length;
     return `<div class="gt-guitar"><div class="gt-body"><i class="gt-hole"></i><i class="gt-bridge"></i></div>
       <div class="gt-neck"><i class="gt-nut"></i>${[1, 2, 3, 4].map(k => `<i class="gt-fret" style="--x:${fx(k).toFixed(4)}"></i>`).join('')}</div>${strings}
-      <div class="gt-keys" style="--cols:${cols};--pcols:${keys.length > 4 ? 2 : 1}">${keys.map(k => `<button type="button" class="gt-key" data-c="${k}" style="--c:${GT_CHORDS[k].c}"><b>${k}</b></button>`).join('')}</div>
+      <div class="gt-keys${keys.length <= 4 ? ' col' : ''}" data-n="${keys.length}" style="--cols:${cols};--pcols:${keys.length > 4 ? 2 : 1}">${keys.map(k => `<button type="button" class="gt-key" data-c="${k}" style="--c:${GT_CHORDS[k].c}"><b>${k}</b></button>`).join('')}</div>
       <i class="gt-hand">👆</i></div>`;
   }
   const strEls = () => [...box.querySelectorAll('.gt-str')];
@@ -3554,38 +3559,41 @@ function guitarGame(root, api) {
 
   // touching the guitar: swipe across the strings to strum, or tap a single string to pluck it
   function wire() {
-    const g = box.querySelector('.gt-guitar'); let ptr = null;
     box.querySelectorAll('.gt-key').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); Sound.unlock(); setChord(b.dataset.c); bump(b, 'hit'); }));
-    g.addEventListener('pointerdown', e => {
-      if (e.target.closest('.gt-key')) return;
-      e.preventDefault(); Sound.unlock(); try { g.setPointerCapture(e.pointerId); } catch (err) {}
-      ptr = { id: e.pointerId, y: e.clientY, x0: e.clientX, y0: e.clientY, dir: 0, lastT: 0, moved: false, ys: strEls().map(s => { const r = s.getBoundingClientRect(); return r.top + r.height / 2; }) };
-    });
-    g.addEventListener('pointermove', e => {
-      if (!ptr || e.pointerId !== ptr.id) return;
-      const y1 = e.clientY, d = Math.sign(y1 - ptr.y);
-      if (Math.abs(y1 - ptr.y0) > 7 || Math.abs(e.clientX - ptr.x0) > 7) ptr.moved = true;
-      if (!d) return;
-      const hit = ptr.ys.map((y, i) => [y, i]).filter(([y]) => d > 0 ? y > ptr.y && y <= y1 : y < ptr.y && y >= y1).sort((a, b) => d * (a[0] - b[0]));
-      if (hit.length) {
-        const now = performance.now(), fresh = d !== ptr.dir || now - ptr.lastT > 320;
-        const soft = fresh ? strumStart() : ptr.soft; ptr.soft = soft;
-        hit.forEach(([, i], k) => pluck(i, k * .009, soft));
-        ptr.dir = d; ptr.lastT = now;
-      }
-      ptr.y = y1;
-    });
-    const end = e => {
-      if (!ptr || e.pointerId !== ptr.id) return;
-      if (!ptr.moved) {
-        const near = ptr.ys.map((y, i) => [Math.abs(y - ptr.y0), i]).sort((a, b) => a[0] - b[0])[0];
-        const soft = strumStart();
-        if (!song && near && near[0] < 14) pluck(near[1]); else strumAll(1, soft);
-      }
-      ptr = null;
-    };
-    g.addEventListener('pointerup', end); g.addEventListener('pointercancel', end);
   }
+  // strumming is watched on the whole play area, so a swipe that starts up on the note strip still crosses every string
+  let ptr = null;
+  box.addEventListener('pointerdown', e => {
+    if (!box.querySelector('.gt-guitar') || e.target.closest('.gt-key, .pg-card, button')) return;
+    e.preventDefault(); Sound.unlock(); try { box.setPointerCapture(e.pointerId); } catch (err) {}
+    ptr = { id: e.pointerId, y: e.clientY, x0: e.clientX, y0: e.clientY, dir: 0, lastT: 0, moved: false, first: true, ys: strEls().map(s => { const r = s.getBoundingClientRect(); return r.top + r.height / 2; }) };
+  });
+  box.addEventListener('pointermove', e => {
+    if (!ptr || e.pointerId !== ptr.id) return;
+    const y1 = e.clientY, d = Math.sign(y1 - ptr.y);
+    if (Math.abs(y1 - ptr.y0) > 7 || Math.abs(e.clientX - ptr.x0) > 7) ptr.moved = true;
+    if (!d) return;
+    // a finger that lands right on a string (or just past it) still plays that string when it starts to move
+    const from = ptr.first ? ptr.y - d * 16 : ptr.y; ptr.first = false;
+    const hit = ptr.ys.map((y, i) => [y, i]).filter(([y]) => d > 0 ? y > from && y <= y1 : y < from && y >= y1).sort((a, b) => d * (a[0] - b[0]));
+    if (hit.length) {
+      const now = performance.now(), fresh = d !== ptr.dir || now - ptr.lastT > 320;
+      const soft = fresh ? strumStart() : ptr.soft; ptr.soft = soft;
+      hit.forEach(([, i], k) => pluck(i, k * .009, soft));
+      ptr.dir = d; ptr.lastT = now;
+    }
+    ptr.y = y1;
+  });
+  const endStrum = e => {
+    if (!ptr || e.pointerId !== ptr.id) return;
+    if (!ptr.moved && box.querySelector('.gt-guitar')) {
+      const near = ptr.ys.map((y, i) => [Math.abs(y - ptr.y0), i]).sort((a, b) => a[0] - b[0])[0];
+      const soft = strumStart();
+      if (!song && near && near[0] < 14) pluck(near[1]); else strumAll(1, soft);
+    }
+    ptr = null;
+  };
+  box.addEventListener('pointerup', endStrum); box.addEventListener('pointercancel', endStrum);
   // the start of each new strum. In a song it plays the next note when the right color is chosen. Returns how loud the strings should be.
   function strumStart() {
     if (!strummed) { strummed = true; clearTimeout(hintT); }
