@@ -1528,13 +1528,15 @@ const Sound = (() => {
     }
     return ctx;
   }
+  // phones only let sound start from a tap: after a tidy-up reload lands straight inside a game, the first tap anywhere wakes it
+  function wake() { if (!ctx || ctx.state !== 'running') unlock(); }
   function unlock() { const c = ac(); if (c && c.state === 'suspended') c.resume(); try { const b = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); } catch (e) {} }
   // Clips are either their own small file, or one line inside a longer "sprite" file (several minutes of lines with
   // short silences between them). Decoded audio is big (a minute is about 11 MB on a phone), and phones reload a page
   // that uses too much memory. So a sprite is never decoded whole: only the bytes around the one line that's needed
   // are cut out and decoded. Recently used lines stay decoded (up to CLIP_BUDGET seconds); the compressed files
   // stay in memory up to BYTE_BUDGET. Anything let go is simply fetched again from the browser's cache.
-  const CLIP_BUDGET = 150, BYTE_BUDGET = 6e6;
+  const CLIP_BUDGET = 100, BYTE_BUDGET = 6e6;
   const files = {}, clips = {};
   let useClock = 0;
   function evict(map, size, budget, keep) {
@@ -1812,7 +1814,7 @@ const Sound = (() => {
   function now() { const c = ac(); return c ? c.currentTime : 0; }
   const api = {
     onStart: null,
-    unlock, say, stopVoice, preload, fx, piano, beep, guitar, guitarWarm, guitarFree, now,
+    unlock, wake, say, stopVoice, preload, fx, piano, beep, guitar, guitarWarm, guitarFree, now,
     memSeconds() { return Object.values(clips).reduce((t, e) => t + (e.v ? e.v.buf.duration : 0), 0); },
     memBytes() { return Object.values(files).reduce((t, e) => t + (e.v ? e.v.ab.byteLength : 0), 0); },
     _clip: load,   // for testing
@@ -1938,15 +1940,18 @@ let current = null, cleanup = null, played = 0;
 // Phones give a web page only so much memory, and Safari never fully lets go of everything a game used.
 // So after a while of play, going back to the game shelf quietly reloads the page and lands right back on the shelf
 // (stars and treehouse are saved, so nothing is lost). Clearing out like this keeps Safari from shutting the page down mid-game.
-const FRESH_GAMES = 15, FRESH_MS = 25 * 60e3, bootT = Date.now();
+// Games with their own list (books, experiments, songs) do the same when going back to that list, and land back on it:
+// each book read counts as several games, since stories use the most voice audio.
+const FRESH_GAMES = 15, FRESH_MS = 20 * 60e3, bootT = Date.now();
 let goingFresh = false;
 let subLabel = '';
-function freshStart() {
+function freshStart(gameId) {
+  if (goingFresh) return true;
   if (played < FRESH_GAMES && Date.now() - bootT < FRESH_MS) return false;
   // remember that this reload is on purpose (in both places, since home-screen apps can lose sessionStorage)
   goingFresh = true;
-  try { sessionStorage.setItem('pr-fresh', '1'); } catch (e) {}
-  try { localStorage.setItem('pr-fresh-at', String(Date.now())); } catch (e) {}
+  try { sessionStorage.setItem('pr-fresh', '1'); sessionStorage.setItem('pr-fresh-game', gameId || ''); } catch (e) {}
+  try { localStorage.setItem('pr-fresh-at', String(Date.now())); localStorage.setItem('pr-fresh-game', gameId || ''); } catch (e) {}
   $('#game').hidden = true; $('#shelf').hidden = false;
   const t = document.createElement('div'); t.className = 'tidy';
   t.innerHTML = `<svg class="pip" viewBox="0 0 100 100" aria-hidden="true">${PIP_ART}</svg><p>Tidying up the playhouse…</p>`;
@@ -1985,6 +1990,8 @@ function openGame(id) {
   const api = {
     intro(ids) { introIds = [].concat(ids); return Sound.say(introIds); },
     win: () => setTimeout(celebrate, 350),
+    round(w = 1) { played += w; },                    // one more book, experiment or song played inside this game
+    tidy() { return current === g && freshStart(g.id); },   // back at the game's own list: maybe reload and come right back here
   };
   cleanup = g.start(groot, api) || null;
 }
@@ -3118,13 +3125,14 @@ function storyGame(root, api) {
   const wrap = t => t.split(/\s+/).map(w => `<span class="w">${w}</span>`).join(' ');
 
   function shelf(talk) {
+    if (api.tidy()) return;
     tok++; stopHL(); Sound.stopVoice(); book = null; shelfBtn.hidden = true; rtm.hidden = true;
     box.innerHTML = `<div class="books">${BOOKS.map((b, i) => `<button class="bookcard" type="button" data-i="${i}">${art(b.cover)}<span class="btitle">${b.title}</span></button>`).join('')}</div>`;
     box.querySelectorAll('.bookcard').forEach(c => c.addEventListener('click', () => { Sound.fx.flip(); open(BOOKS[+c.dataset.i]); }));
     introIds = ['bk_pick']; if (talk) Sound.say('bk_pick');
   }
   async function open(b) {
-    subLabel = b.title;
+    subLabel = b.title; api.round(3);
     book = b; pi = -1; shelfBtn.hidden = false; rtm.hidden = false; wrongOnce = false;
     Sound.preload([b.id + '_title']);
     box.innerHTML = `<div class="titlepage">${art(b.cover)}<h2>${b.title}</h2><button class="big-btn" type="button">Start reading ▶</button></div>`;
@@ -3326,6 +3334,7 @@ function pianoGame(root, api) {
 
   // ---- song picker ----
   function picker(talk) {
+    if (talk !== false && api.tidy()) return;   // not right after a win, while the star is showing
     tok++; Sound.stopVoice(); song = null; hearBtn.hidden = true; songsBtn.hidden = true; subLabel = ''; rot.hidden = true;
     box.innerHTML = `<div class="pg-pick">${SONGS.map((s, i) => `<button type="button" class="pg-card" data-i="${i}"><span class="pg-art">${SONG_ART[s.id]}</span><b>${s.title}</b><span class="pg-lv">${'♪'.repeat(s.level)}${done[s.id] ? '<i class="pg-done">✓</i>' : ''}</span></button>`).join('')}
       <button type="button" class="pg-card free" data-i="-1"><span class="pg-art">${SONG_ART.free}</span><b>Free play</b><span class="pg-lv">Make your own music</span></button></div>`;
@@ -3362,7 +3371,7 @@ function pianoGame(root, api) {
 
   // ---- play a song ----
   function start(s) {
-    tok++; song = s; li = 0; ni = 0; busy = false; wrongs = 0; played = []; hearBtn.hidden = false; songsBtn.hidden = false; subLabel = s.title;
+    tok++; api.round(); song = s; li = 0; ni = 0; busy = false; wrongs = 0; played = []; hearBtn.hidden = false; songsBtn.hidden = false; subLabel = s.title;
     box.innerHTML = `<div class="pg-strip"><div class="pg-title">${s.title}</div><div class="pg-notes"></div><div class="pg-prog"><i></i></div></div>${keyboard()}`;
     wireKeys(); drawLine();
     introIds = ['mu_s_' + s.id]; checkRot(); if (rot.hidden) Sound.say(introIds);
@@ -3535,6 +3544,7 @@ function guitarGame(root, api) {
 
   // ---- song picker ----
   function picker(talk) {
+    if (talk !== false && api.tidy()) return;   // not right after a win, while the star is showing
     tok++; stop(); Sound.stopVoice(); quiet(); song = null; hearBtn.hidden = true; songsBtn.hidden = true; subLabel = ''; rot.hidden = true;
     box.innerHTML = `<div class="pg-pick">${GT_SONGS.map((s, i) => `<button type="button" class="pg-card" data-i="${i}"><span class="pg-art">${GT_SONG_ART[s.id] || SONG_ART[s.id]}</span><b>${s.title}</b><span class="pg-lv">${chordsOf(s.lines).map(k => `<i class="gt-pc" style="--c:${GT_CHORDS[k].c}"></i>`).join('')}${done[s.id] ? '<i class="pg-done">✓</i>' : ''}${done[s.id + '_hard'] ? '<i class="pg-done gt-hard">✓</i>' : ''}</span></button>`).join('')}
       <button type="button" class="pg-card free" data-i="-1"><span class="pg-art">${GT_SONG_ART.free}</span><b>Free play</b><span class="pg-lv">Make your own music</span></button></div>`;
@@ -3653,7 +3663,7 @@ function guitarGame(root, api) {
   // ---- play a song: colored notes slide to the circle; pick that color and strum ----
   let hard = false, lines = [];
   function start(s, h) {
-    tok++; stop(); quiet(); song = s; hard = !!h; lines = hard ? s.hardLines : s.lines; busy = false; wrongs = 0; hearBtn.hidden = false; songsBtn.hidden = false; subLabel = s.title + (hard ? ' (hard)' : '');
+    tok++; api.round(); stop(); quiet(); song = s; hard = !!h; lines = hard ? s.hardLines : s.lines; busy = false; wrongs = 0; hearBtn.hidden = false; songsBtn.hidden = false; subLabel = s.title + (hard ? ' (hard)' : '');
     let t = 0; notes = lines.flatMap((l, L) => l.map((x, j) => { const n = { ...x, t, L, j }; t += x.b; return n; }));
     lanes = chordsOf(lines); next = 0; pos = -LOOK + 1;
     box.innerHTML = `<div class="gt-track"><i class="gt-target"></i><div class="gt-gems">${notes.map((n, i) => `<i class="gt-gem" data-i="${i}" style="--c:${GT_CHORDS[n.ch].c}"><b>${n.change ? n.ch : ''}</b><small>${n.w}</small></i>`).join('')}</div><div class="pg-prog"><i></i></div></div>${guitarHTML(lanes)}`;
@@ -7097,13 +7107,14 @@ function scienceGame(root, api) {
   const doneMap = store.get('pr-sci-done', {});
   function stop() { tok++; cleanups.forEach(f => { try { f(); } catch (e) {} }); cleanups = []; Sound.stopVoice(); }
   function picker(talk) {
+    if (api.tidy()) return;
     stop(); backBtn.hidden = true;
     box.innerHTML = `<div class="sci-grid">${SCI_TOPICS.map((t, i) => `<button class="sci-card${doneMap[t.id] ? ' done' : ''}" type="button" data-i="${i}"><span class="sci-ic" style="background:${t.bg}">${SCI_ART[t.id] || t.icon}</span><span class="sci-nm">${t.name}</span>${doneMap[t.id] ? '<span class="sci-ck">⭐</span>' : ''}</button>`).join('')}</div>`;
     box.querySelectorAll('.sci-card').forEach(b => b.addEventListener('click', () => { Sound.fx.tap(); open(SCI_TOPICS[+b.dataset.i]); }));
     introIds = ['sc_pick']; if (talk) Sound.say('sc_pick');
   }
   function open(t) {
-    stop(); backBtn.hidden = false; const my = tok; subLabel = t.name;
+    stop(); api.round(); backBtn.hidden = false; const my = tok; subLabel = t.name;
     box.innerHTML = `<div class="sci-wrap"><div class="sci-stage sci-${t.id}"><svg class="sci-svg" viewBox="0 0 400 300"></svg><svg class="sci-hand" viewBox="0 0 400 300"><text class="hand" x="0" y="0">👆</text></svg></div></div>`;
     const stage = box.querySelector('.sci-stage'), svg = stage.querySelector('.sci-svg'), handT = stage.querySelector('.hand');
     const alive = () => my === tok && box.isConnected;
@@ -8658,6 +8669,10 @@ function hideRestartNote() { const n = $('#restartNote'); if (n) n.hidden = true
   if (hb && hb.fresh && Date.now() - hb.t < 60e3) fresh = fresh || '1';
   const recent = hb && Date.now() - hb.t < 30 * 60e3 && !hb.clean && !!activePid;
   if ((fresh && activePid) || recent) { $('#splash').hidden = true; $('#shelf').hidden = false; caption(TEXT.hub); Sound.preload(['hub', 'star', ...PRAISE, ...TRY]); }
+  // a tidy-up reload from inside a game (between books, experiments or songs) goes straight back into that game
+  let freshGame = '';
+  try { freshGame = sessionStorage.getItem('pr-fresh-game') || localStorage.getItem('pr-fresh-game') || ''; sessionStorage.removeItem('pr-fresh-game'); localStorage.removeItem('pr-fresh-game'); } catch (e) {}
+  if (fresh && activePid && freshGame && GAMES.some(g => g.id === freshGame)) openGame(freshGame);
   if (!fresh && recent) {
     const where = [hb.g, hb.s].filter(Boolean).join(' › ') || 'the game shelf', mins = Math.max(1, Math.round((hb.t - hb.b) / 60e3));
     const how = hb.v === 'hidden' ? 'while the app was in the background' : 'during play';
@@ -8667,6 +8682,7 @@ function hideRestartNote() { const n = $('#restartNote'); if (n) n.hidden = true
     try { const log = JSON.parse(localStorage.getItem('pr-restarts') || '[]'); log.push(new Date().toLocaleString() + ': ' + note); localStorage.setItem('pr-restarts', JSON.stringify(log.slice(-10))); } catch (e) {}
   }
 })();
+['pointerdown', 'touchend', 'click'].forEach(ev => document.addEventListener(ev, () => Sound.wake(), { capture: true, passive: true }));
 // a normal close or reload is marked "clean" (and stays marked, even though the page also turns hidden right after)
 let closing = false;
 beat(); setInterval(() => beat(closing ? { clean: true } : null), 4000);
