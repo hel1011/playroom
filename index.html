@@ -1065,6 +1065,8 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 /* ---------- Pip's Treehouse ---------- */
 #game.nopip .gamebar .pip { display: none !important; }
 .tree { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 4px; }
+.tree.side { flex-direction: row; align-items: flex-start; justify-content: center; gap: 10px; }
+.tree.side .tree-shop { flex: 1 1 0; width: auto; max-width: 420px; height: 100%; }
 .tree-scene { position: relative; flex: 0 0 auto; border-radius: 22px; overflow: hidden; box-shadow: 0 6px 0 var(--edge); touch-action: none; }
 .tree-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .tree-bg .cloud { animation: drift 16s ease-in-out infinite alternate; } .tree-bg .c2 { animation-duration: 22s; }
@@ -4662,9 +4664,9 @@ const TREE_ITEMS = [
   ['chest', CHEST_SVG, 3, 'decor', [11, 71], 9, true, true],
   // inside the treehouse (last field true): these can only be bought and used indoors
   ['couch', '🛋️', 2, 'decor', [52, 73], 17, false, false, true], ['books', '📚', 1, 'decor', [35, 46], 7, false, false, true],
-  ['painting', '🖼️', 1, 'decor', [68, 36], 8, false, false, true], ['guitar', '🎸', 2, 'decor', [76, 70], 10, false, false, true],
+  ['painting', '🖼️', 1, 'decor', [36, 36], 8, false, false, true], ['guitar', '🎸', 2, 'decor', [76, 70], 10, false, false, true],
   ['fishbowl', BOWL_SVG, 2, 'decor', [28, 80], 9, true, false, true], ['bed', '🛏️', 2, 'decor', [72, 87], 15, false, false, true],
-  ['lantern', '🏮', 2, 'decor', [30, 20], 7, false, false, true], ['clock', '🕰️', 2, 'decor', [27, 31], 8, false, false, true],
+  ['lantern', '🏮', 2, 'decor', [38, 23], 7, false, false, true], ['clock', '🕰️', 2, 'decor', [29, 20], 7, false, false, true],
   ['radio', '📻', 2, 'decor', [43, 87], 8, false, false, true], ['teapot', '🫖', 1, 'decor', [37, 74], 6, false, false, true],
   ['easel', EASEL_SVG, 2, 'decor', [12, 83], 10, true, false, true],
   ['globe', '🌍', 2, 'decor', [93, 84], 8, false, true, true], ['robot', '🤖', 3, 'decor', [58, 87], 9, false, true, true],
@@ -4674,9 +4676,10 @@ const TREE_ITEMS = [
   ['fireworks', FIREWORKS_SVG, 10, 'decor', [10, 90], 8, true, false, false, 'super'], ['weather', WEATHER_SVG, 10, 'decor', [93, 86], 7, true, false, false, 'super'],
   ['pool', POOL_SVG, 10, 'decor', [52, 91], 26, true, false, false, 'super'],
   ['bunny', PET_SVG('bunny'), 10, 'decor', [64, 85], 10, true, false, true, 'super'], ['aquarium', AQUARIUM_SVG, 10, 'decor', [66, 58], 20, true, false, true, 'super'],
-  ['trainset', TRAINSET_SVG, 10, 'decor', [50, 88], 42, true, false, true, 'super'], ['movie', MOVIE_SVG, 10, 'decor', [73, 30], 18, true, false, true, 'super'],
+  ['trainset', TRAINSET_SVG, 10, 'decor', [50, 89], 36, true, false, true, 'super'], ['movie', MOVIE_SVG, 10, 'decor', [76, 40], 16, true, false, true, 'super'],
   ['space', PORTAL_SVG, 10, 'decor', [90, 72], 8, true, false, true, 'super'],
 ];
+const TREE_OLD_SPOTS = { lantern: [30, 20], clock: [27, 31], painting: [68, 36], movie: [73, 30], trainset: [50, 88] };
 const WEAR = { bow: '<text class="acc" x="64" y="20" font-size="13" text-anchor="middle">🎀</text>', shades: '<text class="acc" x="50" y="41" font-size="24" text-anchor="middle">🕶️</text>',
   tophat: '<text class="acc" x="50" y="16" font-size="26" text-anchor="middle">🎩</text>', cap: '<text class="acc" x="52" y="19" font-size="24" text-anchor="middle">🧢</text>', crown: '<text class="acc" x="50" y="18" font-size="21" text-anchor="middle">👑</text>' };
 function treeData() {
@@ -4839,6 +4842,53 @@ function treeGame(root, api) {
       s.style.setProperty('--dx', Math.cos(a) * 60 + 'px'); s.style.setProperty('--dy', Math.sin(a) * 60 + 'px');
       scene.appendChild(s); setTimeout(() => s.remove(), 1000);
     }
+  }
+  // ---- making room: each thing takes up a box (its size across, and its height from the picture's shape) ----
+  // the rainbow, the string of lights, the aquarium and the movie screen hang behind things, so other things can sit in front of them
+  const flat = id => ['lights', 'rainbow', 'aquarium', 'movie'].includes(id);
+  const shapeOf = t => { if (!t[6]) return 1; const m = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(t[1]); return m ? m[2] / m[1] : 1; };
+  const footOf = (id, [x, y]) => { const t = byId(id), w = t[5], h = t[5] * shapeOf(t) / .75; return [x - w / 2, y - h / 2, w, h]; };
+  const overlap = (a, b) => Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]));
+  const doorFor = room => room === 'in' ? DOORS.in : data.big ? DOORS.outBig : DOORS.out;
+  function pipBox() {   // Pip, only when he's in the room being arranged
+    const s = scene.getBoundingClientRect(), r = pipW.getBoundingClientRect(); if (!s.width || !r.width) return null;
+    return [(r.left - s.left) / s.width * 100, (r.top - s.top) / s.height * 100, r.width / s.width * 100, r.height / s.height * 100];
+  }
+  // how much of this thing would be covered, from 0 (all clear) to 1 or more
+  function crowd(id, pos, others, room) {
+    const f = footOf(id, pos), area = f[2] * f[3]; let o = overlap(f, doorFor(room));
+    for (const [k, p] of others) if (k !== id && !flat(k)) o += overlap(f, footOf(k, p));
+    const pb = room === where ? pipBox() : null; if (pb) o += overlap(f, pb) * .6;
+    return o / area;
+  }
+  // the closest open spot to where this thing usually goes, staying at about the same height (floor things stay on the floor)
+  function openSpot(id, others, room) {
+    const t = byId(id), start = t[4].slice(); if (flat(id)) return start;
+    const [, , w, h] = footOf(id, start); let best = start, bs = crowd(id, start, others, room);
+    if (bs < .06) return best;
+    const cand = [];
+    for (let dx = -18; dx <= 18; dx++) for (let dy = -4; dy <= 4; dy++) if (dx || dy) cand.push([dx * 3.5, dy * 3]);
+    cand.sort((a, b) => (a[0] * a[0] + 2.2 * a[1] * a[1]) - (b[0] * b[0] + 2.2 * b[1] * b[1]));
+    for (const [dx, dy] of cand) {
+      const x = start[0] + dx, y = start[1] + dy;
+      if (x - w / 2 < 1 || x + w / 2 > 99 || y - h / 2 < 2 || y + h / 2 > 99) continue;
+      const c = crowd(id, [x, y], others, room);
+      if (c < bs - .01) { bs = c; best = [+x.toFixed(1), +y.toFixed(1)]; if (c < .06) break; }
+    }
+    return best;
+  }
+  // things nobody has moved yet that ended up piled on top of each other get spread out, once
+  function spreadOut(room) {
+    const m = room === 'in' ? data.inOwn : data.own; let changed = false;
+    const never = id => { const t = byId(id), p = m[id], o = TREE_OLD_SPOTS[id]; return !!t && !!t[4] && ((p[0] === t[4][0] && p[1] === t[4][1]) || (o && p[0] === o[0] && p[1] === o[1])); };
+    const ids = Object.keys(m).filter(id => byId(id));
+    const kept = ids.filter(id => !never(id)).map(id => [id, m[id]]);
+    for (const id of ids.filter(never).sort((a, b) => byId(b)[5] - byId(a)[5])) {   // the biggest things first, then the small ones fit around them
+      const t = byId(id); if (m[id][0] !== t[4][0] || m[id][1] !== t[4][1]) { m[id] = t[4].slice(); changed = true; }
+      if (crowd(id, m[id], kept, room) > .15) { const p = openSpot(id, kept, room); if (p[0] !== m[id][0] || p[1] !== m[id][1]) { m[id] = p; changed = true; } }
+      kept.push([id, m[id]]);
+    }
+    if (changed) save();
   }
   function placeItem(id, pop) {
     const t = byId(id), [x, y] = cur()[id];
@@ -5171,7 +5221,7 @@ function treeGame(root, api) {
     stars -= price; if (t[9]) confetti(); store.set('pr-stars', stars); showStars(); bumpStars();
     Sound.fx.match();
     if (kind === 'wear') { data.wearOwn = [...(data.wearOwn || []), id]; data.wear = id; save(); applyWear(); sparkle(60, 50); }
-    else { (t[8] ? data.inOwn : data.own)[id] = t[4].slice(); save(); placeItem(id, true); }
+    else { const room = t[8] ? 'in' : 'out', m = room === 'in' ? data.inOwn : data.own; m[id] = openSpot(id, Object.entries(m), room); save(); if (room === where) placeItem(id, true); }
     delete pipSvg.dataset.busy; pipAct(pipSvg, 'happy', 900);
     const lines = ['th_' + id]; if (kind !== 'wear' && firstBuy) { firstBuy = false; lines.push('th_drag'); }
     Sound.say(lines); renderShop();
@@ -5180,8 +5230,9 @@ function treeGame(root, api) {
   function drawWorld() {
     world.querySelector('.tree-bg')?.remove(); world.insertAdjacentHTML('afterbegin', where === 'in' ? (data.big ? ROOM_BG_BIG : ROOM_BG) : (data.big ? TREE_BG_BIG : TREE_BG));
     scene.classList.toggle('inside', where === 'in'); scene.classList.toggle('bigroom', !!data.big); scene.classList.toggle('cozy', where === 'in' && !!data.cozy);
+    setPip(0); spreadOut(where);
     itemsEl.innerHTML = ''; Object.keys(cur()).forEach(id => byId(id) && placeItem(id, false));
-    setPip(0); applyWeather();
+    applyWeather();
     const d = doorBox(); Object.assign(door.style, { left: d[0] + '%', top: d[1] + '%', width: d[2] + '%', height: d[3] + '%' });
     door.classList.remove('opening'); door.classList.toggle('locked', where === 'out' && !data.inside); door.classList.toggle('exit', where === 'in');
     door.setAttribute('aria-label', where === 'in' ? 'Go back outside' : data.inside ? 'Go inside the treehouse' : `Open the treehouse door for ${IN_PRICE} stars`);
@@ -5226,7 +5277,11 @@ function treeGame(root, api) {
   }
   function size() {
     const W = root.clientWidth - 8, H = root.clientHeight - 8, shopMin = W < 600 ? 150 : 170;
-    const w = Math.max(240, Math.min(W, (H - shopMin) * 4 / 3));
+    const stacked = Math.max(240, Math.min(W, (H - shopMin) * 4 / 3));
+    // sideways: the shop goes beside the treehouse, so the treehouse can be as tall as the screen
+    const shopW = Math.min(340, Math.max(220, W * .32)), beside = Math.min(W - shopW - 10, (H - 8) * 4 / 3);
+    const side = beside > stacked * 1.12; box.classList.toggle('side', side);
+    const w = side ? beside : stacked;
     scene.style.width = w + 'px'; scene.style.height = w * .75 + 'px'; scene.style.setProperty('--u', w / 100 + 'px');
   }
   drawWorld(); applyWear();
