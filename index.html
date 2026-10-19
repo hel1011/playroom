@@ -3577,7 +3577,7 @@ function guitarGame(root, api) {
   const strEls = () => [...box.querySelectorAll('.gt-str')];
   const keyOf = k => box.querySelector(`.gt-key[data-c="${k}"]`);
   function setChord(k) {
-    if (k !== chord) quiet(Sound.now());   // lifting your fingers to change chords stops the old one ringing
+    // picking a new color doesn't stop what's ringing: each string keeps sounding until the next strum plays it again
     chord = k; box.querySelectorAll('.gt-key').forEach(b => b.classList.toggle('on', b.dataset.c === k));
   }
   function quiet(at) { ring.forEach((h, i) => { if (h) h.stop(at); ring[i] = null; }); if (lead) { lead.stop(at); lead = null; } }
