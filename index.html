@@ -3356,8 +3356,13 @@ function pianoGame(root, api) {
     return `<div class="pg-piano">${PNOTES.map(([id, , col, L], i) => `<button type="button" class="pk w" data-n="${id}" style="--c:${col}" aria-label="${L}"><span class="pk-dot">${L}</span><i class="pk-arrow">▼</i></button>`).join('')}
       ${PBLACK.map(([id, , after]) => `<button type="button" class="pk b" data-n="${id}" style="--x:${after + 1}" aria-label="${id[0]} sharp"></button>`).join('')}</div>`;
   }
+  // several fingers can play at once. iPhones report fingers that land together as touches, so both kinds of event are
+  // listened to, and a key can't count twice for the same finger.
   function wireKeys() {
-    box.querySelectorAll('.pk').forEach(k => k.addEventListener('pointerdown', e => { e.preventDefault(); press(k); }));
+    const kb = box.querySelector('.pg-piano');
+    const go = k => { if (!k) return; const now = performance.now(); if (now - (k._t || 0) < 90) return; k._t = now; press(k); };
+    box.querySelectorAll('.pk').forEach(k => k.addEventListener('pointerdown', e => { e.preventDefault(); go(k); }));
+    kb.addEventListener('touchstart', e => { for (const t of e.changedTouches) go(document.elementFromPoint(t.clientX, t.clientY)?.closest('.pk')); }, { passive: true });
   }
   function freqOf(id) { const w = noteOf(id); if (w) return w[1]; const b = PBLACK.find(x => x[0] === id); return b ? b[1] : 440; }
   function hit(k, dur) {
@@ -3614,14 +3619,17 @@ function guitarGame(root, api) {
     box.querySelectorAll('.gt-key').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); Sound.unlock(); setChord(b.dataset.c); bump(b, 'hit'); }));
   }
   // strumming is watched on the whole play area, so a swipe that starts up on the note strip still crosses every string
-  let ptr = null;
+  // every finger is followed on its own, so two fingers can pluck two strings at once (or strum together)
+  const ptrs = new Map(); let lastStrum = 0, lastSoft = 1;
+  // fingers that start strumming at the same moment make one strum together (in a song, that's one note, not two)
+  function strumOnce() { const now = performance.now(); if (now - lastStrum < 120) return lastSoft; lastStrum = now; lastSoft = strumStart(); return lastSoft; }
   box.addEventListener('pointerdown', e => {
     if (!box.querySelector('.gt-guitar') || e.target.closest('.gt-key, .pg-card, button')) return;
     e.preventDefault(); Sound.unlock(); try { box.setPointerCapture(e.pointerId); } catch (err) {}
-    ptr = { id: e.pointerId, y: e.clientY, x0: e.clientX, y0: e.clientY, dir: 0, lastT: 0, moved: false, first: true, ys: strEls().map(s => { const r = s.getBoundingClientRect(); return r.top + r.height / 2; }) };
+    ptrs.set(e.pointerId, { id: e.pointerId, y: e.clientY, x0: e.clientX, y0: e.clientY, dir: 0, lastT: 0, moved: false, first: true, ys: strEls().map(s => { const r = s.getBoundingClientRect(); return r.top + r.height / 2; }) });
   });
   box.addEventListener('pointermove', e => {
-    if (!ptr || e.pointerId !== ptr.id) return;
+    const ptr = ptrs.get(e.pointerId); if (!ptr) return;
     const y1 = e.clientY, d = Math.sign(y1 - ptr.y);
     if (Math.abs(y1 - ptr.y0) > 7 || Math.abs(e.clientX - ptr.x0) > 7) ptr.moved = true;
     if (!d) return;
@@ -3630,20 +3638,19 @@ function guitarGame(root, api) {
     const hit = ptr.ys.map((y, i) => [y, i]).filter(([y]) => d > 0 ? y > from && y <= y1 : y < from && y >= y1).sort((a, b) => d * (a[0] - b[0]));
     if (hit.length) {
       const now = performance.now(), fresh = d !== ptr.dir || now - ptr.lastT > 320;
-      const soft = fresh ? strumStart() : ptr.soft; ptr.soft = soft;
+      const soft = fresh ? strumOnce() : ptr.soft; ptr.soft = soft;
       hit.forEach(([, i], k) => pluck(i, k * .009, soft));
       ptr.dir = d; ptr.lastT = now;
     }
     ptr.y = y1;
   });
   const endStrum = e => {
-    if (!ptr || e.pointerId !== ptr.id) return;
+    const ptr = ptrs.get(e.pointerId); if (!ptr) return; ptrs.delete(e.pointerId);
     if (!ptr.moved && box.querySelector('.gt-guitar')) {
       const near = ptr.ys.map((y, i) => [Math.abs(y - ptr.y0), i]).sort((a, b) => a[0] - b[0])[0];
-      const soft = strumStart();
+      const soft = strumOnce();
       if (!song && near && near[0] < 14) pluck(near[1]); else strumAll(1, soft);
     }
-    ptr = null;
   };
   box.addEventListener('pointerup', endStrum); box.addEventListener('pointercancel', endStrum);
   // the start of each new strum. In a song it plays the next note when the right color is chosen. Returns how loud the strings should be.
