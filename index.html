@@ -3360,7 +3360,7 @@ function pianoGame(root, api) {
   // listened to, and a key can't count twice for the same finger.
   function wireKeys() {
     const kb = box.querySelector('.pg-piano');
-    const go = k => { if (!k) return; const now = performance.now(); if (now - (k._t || 0) < 90) return; k._t = now; press(k); };
+    const go = k => { if (!k) return; const now = performance.now(); if (now - (k._t || 0) < 45) return; k._t = now; press(k); };
     box.querySelectorAll('.pk').forEach(k => k.addEventListener('pointerdown', e => { e.preventDefault(); go(k); }));
     kb.addEventListener('touchstart', e => { for (const t of e.changedTouches) go(document.elementFromPoint(t.clientX, t.clientY)?.closest('.pk')); }, { passive: true });
   }
