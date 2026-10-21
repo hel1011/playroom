@@ -3361,8 +3361,17 @@ function pianoGame(root, api) {
   function wireKeys() {
     const kb = box.querySelector('.pg-piano');
     const go = k => { if (!k) return; const now = performance.now(); if (now - (k._t || 0) < 45) return; k._t = now; press(k); };
-    box.querySelectorAll('.pk').forEach(k => k.addEventListener('pointerdown', e => { e.preventDefault(); go(k); }));
-    kb.addEventListener('touchstart', e => { for (const t of e.changedTouches) go(document.elementFromPoint(t.clientX, t.clientY)?.closest('.pk')); }, { passive: true });
+    // sliding a finger along the keys plays each new key it reaches (each finger remembers the key it's on)
+    const on = new Map(), keyAt = (x, y) => document.elementFromPoint(x, y)?.closest('.pg-piano .pk') || null;
+    const slide = (id, x, y) => { if (!on.has(id)) return; const k = keyAt(x, y); if (k && k !== on.get(id)) { on.set(id, k); go(k); } };
+    box.querySelectorAll('.pk').forEach(k => k.addEventListener('pointerdown', e => { e.preventDefault(); on.set('p' + e.pointerId, k); go(k); }));
+    kb.addEventListener('pointermove', e => slide('p' + e.pointerId, e.clientX, e.clientY));
+    const lift = e => on.delete('p' + e.pointerId);
+    kb.addEventListener('pointerup', lift); kb.addEventListener('pointercancel', lift); kb.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') lift(e); });
+    kb.addEventListener('touchstart', e => { for (const t of e.changedTouches) { const k = keyAt(t.clientX, t.clientY); on.set('t' + t.identifier, k); go(k); } }, { passive: true });
+    kb.addEventListener('touchmove', e => { for (const t of e.changedTouches) slide('t' + t.identifier, t.clientX, t.clientY); }, { passive: true });
+    const tlift = e => { for (const t of e.changedTouches) on.delete('t' + t.identifier); };
+    kb.addEventListener('touchend', tlift); kb.addEventListener('touchcancel', tlift);
   }
   function freqOf(id) { const w = noteOf(id); if (w) return w[1]; const b = PBLACK.find(x => x[0] === id); return b ? b[1] : 440; }
   function hit(k, dur) {
