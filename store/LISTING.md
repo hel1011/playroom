@@ -31,7 +31,7 @@ WHAT'S INSIDE
 • Memory Match games with animals, opposites and colors.
 • Photo Puzzle: jigsaw puzzles from 4 to 12 pieces, including puzzles made from your own photos.
 • Paint, Balloon Pop and Tic-Tac-Toe.
-• Pip's Treehouse: earn stars by playing, then spend them decorating Pip's treehouse, inside and out. Save up for super special things like a puppy that follows Pip around, a hot air balloon ride, fireworks, a weather machine and a room that turns into outer space. Inside, save up for four arcade cabinets you can really play: Moon Landing, Turbo Race, Free Kick and Brick Breaker.
+• Pip's Treehouse: earn stars by playing, then spend them decorating Pip's treehouse, inside and out. Save up for super special things like a puppy that follows Pip around, a hot air balloon ride, fireworks, a weather machine and a room that turns into outer space. Inside, save up for six arcade cabinets you can really play: Moon Landing, Turbo Race, Free Kick, Brick Breaker, Skee-Ball and Table Tennis. Kids can also drag Pip anywhere in his treehouse.
 
 MADE FOR FAMILIES
 • A separate player for each child, with their own stars and progress.
