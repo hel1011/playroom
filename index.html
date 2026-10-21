@@ -617,8 +617,8 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .arc-x { border: 0; width: 46px; height: 46px; border-radius: 50%; background: #ff5a4e; color: #fff; font: 800 22px/1 var(--f-display); box-shadow: 0 4px 0 #b83a32; cursor: pointer; }
 .arc-stage { position: relative; flex: 1 1 auto; min-height: 0; display: grid; place-items: center; padding: 0 8px 8px; }
 .arc-cv { display: block; border-radius: 16px; touch-action: none; user-select: none; -webkit-user-select: none; box-shadow: 0 0 0 4px rgba(255,255,255,.08); }
-.arc-msg { position: absolute; left: 50%; top: 40%; translate: -50% -50%; background: #fff; color: var(--ink); border-radius: 22px; padding: 14px 22px; font: 800 clamp(20px, 5vw, 30px)/1.15 var(--f-display); text-align: center; box-shadow: 0 6px 0 rgba(0,0,0,.25); pointer-events: none; max-width: 86%; }
-.arc-msg.pop { animation: plop .4s cubic-bezier(.3,1.6,.5,1); }
+.arc-msg { position: absolute; left: 50%; top: 30%; translate: -50% -50%; background: #fff; color: var(--ink); border-radius: 22px; padding: 14px 22px; font: 800 clamp(20px, 5vw, 30px)/1.15 var(--f-display); text-align: center; box-shadow: 0 6px 0 rgba(0,0,0,.25); pointer-events: none; max-width: 86%; }
+.arc-msg.bump { animation: plop .4s cubic-bezier(.3,1.6,.5,1); }
 @media (max-height: 520px) { .arc-top { padding: 4px 8px 2px 12px; font-size: 17px; } .arc-x { width: 40px; height: 40px; } }
 .sci-fossil .sci-svg, .sci-bees .sci-svg { touch-action: none; }
 .fs-gone { transition: opacity .25s, transform .25s; opacity: 0; transform-box: fill-box; transform-origin: center; transform: scale(.4); }
@@ -4893,7 +4893,8 @@ function openArcade(kind, host, onClose) {
   const api = {
     g, W, H,
     score(t) { scoreEl.textContent = t; },
-    msg(t, ms = 1800) { msgEl.textContent = t; msgEl.hidden = false; msgEl.classList.remove('pop'); void msgEl.offsetWidth; msgEl.classList.add('pop'); clearTimeout(msgT); msgT = setTimeout(() => { msgEl.hidden = true; }, ms); },
+    // the bubble's pop-in class is "bump": the name "pop" already means a full-screen layer in this app
+    msg(t, ms = 1800) { msgEl.textContent = t; msgEl.hidden = false; msgEl.classList.remove('bump'); void msgEl.offsetWidth; msgEl.classList.add('bump'); clearTimeout(msgT); msgT = setTimeout(() => { msgEl.hidden = true; }, ms); },
     say(id, gap = 0) { const now = performance.now(); if (now - said < gap) return; said = now; Sound.say(id); },
     fx: Sound.fx,
   };
