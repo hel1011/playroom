@@ -5142,62 +5142,124 @@ function arcKick(a) {
   };
 }
 
-// ---- Brick Breaker: slide to move the paddle, tap to launch; a missed ball just comes back to the paddle ----
+// ---- Brick Breaker: slide to move the paddle, tap to launch; a missed ball just comes back to the paddle.
+// Power-ups drop from some bricks (always from star bricks); the ball gets faster each level, and tough bricks start at level 3 ----
+function arcStar(g, x, y, r, c) { g.fillStyle = c; g.beginPath(); for (let i = 0; i < 10; i++) { const rr = i % 2 ? r * .45 : r, t = -Math.PI / 2 + i * Math.PI / 5; g.lineTo(x + Math.cos(t) * rr, y + Math.sin(t) * rr); } g.closePath(); g.fill(); }
 function arcBricks(a) {
-  const { g, W, H } = a, COLS = 8, BW = (W - 40) / COLS, BH = 20, TOP = 48, PY = H - 28;
+  const { g, W, H } = a, COLS = 8, BW = (W - 40) / COLS, BH = 20, TOP = 46, PY = H - 30, NET_Y = H - 9;
   const ROWC = ['#ff5a4e', '#ff9f1c', '#ffd23f', '#45c46a', '#28b8c8', '#4a8bff', '#9a6bff'];
-  // patterns: full wall, a heart, a smile, a checkerboard
+  // walls: 1 = a brick, 2 = a tough brick (two hits, from level 3), * = a star brick (always drops a power-up)
   const PAT = [
-    ['11111111', '11111111', '11111111', '11111111'],
-    ['01100110', '11111111', '11111111', '01111110', '00111100', '00011000'],
-    ['00111100', '01111110', '11011011', '11111111', '10111101', '01000010', '00111100'],
-    ['10101010', '01010101', '10101010', '01010101', '10101010'],
+    ['11111111', '11*11*11', '11111111', '11111111'],
+    ['01100110', '11111111', '11*11*11', '01111110', '00111100', '00011000'],
+    ['00011000', '00111100', '01122110', '11*11*11', '11111111', '22222222'],
+    ['00111100', '01111110', '11011011', '11*11*11', '10111101', '01022010', '00111100'],
+    ['00011000', '00122100', '00111100', '01*11*10', '01111110', '11011011', '10000001'],
+    ['22222222', '11111111', '1*1111*1', '11111111', '22222222', '11111111'],
+    ['10101010', '01210121', '1*1*1*1*', '01210121', '10101010'],
   ];
-  let level = 0, bricks, pad = { x: W / 2, w: 104, tx: W / 2 }, ball, stuck = true, broke = 0, clearT = -1, touched = false, missT = 0;
-  function build() { const p = PAT[level % PAT.length]; bricks = []; p.forEach((row, r) => [...row].forEach((c, k) => { if (c === '1') bricks.push({ x: 20 + k * BW + 3, y: TOP + r * (BH + 6), w: BW - 6, h: BH, c: ROWC[r % ROWC.length] }); })); }
-  function newBall() { stuck = true; ball = { x: pad.x, y: PY - 18, vx: 0, vy: 0, r: 9 }; }
-  build(); newBall(); a.score(`🧱 ${broke}`);
-  const speed = () => Math.min(270, 215 + level * 12);
+  // power-ups: the capsule falls; catch it with the paddle
+  const POWERS = {
+    big: { ic: '🍄', c: '#ff5a4e', t: 14, say: 'Big paddle!' },
+    multi: { ic: '⚪', c: '#4a8bff', t: 0, say: 'Three balls!' },
+    fire: { ic: '🔥', c: '#ff9f1c', t: 8, say: 'Fireball!' },
+    slow: { ic: '🐢', c: '#45c46a', t: 10, say: 'Slow ball' },
+    net: { ic: '🛡️', c: '#9a6bff', t: 14, say: 'Safety net!' },
+  };
+  let level = 0, bricks, pad = { x: W / 2, w: 104, tw: 104, tx: W / 2 }, balls, stuck = true, broke = 0, clearT = -1, touched = false, missT = 0;
+  let caps = [], on = {}, boost = 0, sparks = [];
+  const show = () => a.score(`🧱 ${broke} · Lv ${level + 1}`);
+  function build() {
+    const p = PAT[level % PAT.length]; bricks = [];
+    p.forEach((row, r) => [...row].forEach((c, k) => {
+      if (c === '0') return;
+      const tough = c === '2' && level >= 2;
+      bricks.push({ x: 20 + k * BW + 3, y: TOP + r * (BH + 6), w: BW - 6, h: BH, c: ROWC[r % ROWC.length], hp: tough ? 2 : 1, star: c === '*' });
+    }));
+  }
+  const speed = () => Math.min(340, 215 + level * 16 + boost) * (on.slow > 0 ? .62 : 1);   // faster each level, and a little faster as you go
+  function newBall() { stuck = true; balls = [{ x: pad.x, y: PY - 18, vx: 0, vy: 0, r: 9 }]; }
+  function launch(b, ang) { const s = speed(); b.vx = Math.sin(ang) * s; b.vy = -Math.cos(ang) * s; }
+  function resize(b) { const s = speed(), cur = Math.hypot(b.vx, b.vy) || 1; b.vx *= s / cur; b.vy *= s / cur; }
+  function power(kind) {
+    const P = POWERS[kind]; a.fx.magic(); a.msg(`${P.ic} ${P.say}`, 1300);
+    if (kind === 'multi') {
+      const src = balls.find(b => b) || balls[0]; if (stuck) { stuck = false; launch(src, -.2); }
+      for (const d of [-.45, .45]) { const nb = { x: src.x, y: src.y, vx: 0, vy: 0, r: 9 }; const ang = Math.atan2(src.vx, -src.vy) + d; launch(nb, Math.max(-1.2, Math.min(1.2, ang))); balls.push(nb); }
+    } else on[kind] = P.t;
+    if (kind === 'slow') balls.forEach(resize);
+  }
+  build(); newBall(); show();
   return {
-    peek: () => ({ bx: ball.x, by: ball.y, px: pad.x, left: bricks.length, stuck, broke, level }),
+    peek: () => ({ bx: balls[0] ? balls[0].x : pad.x, by: balls[0] ? balls[0].y : PY, balls: balls.map(b => [b.x, b.y]), px: pad.x, pw: pad.w, left: bricks.length, stuck, broke, level, caps: caps.map(c => [c.x, c.y, c.k]), on: { ...on }, spd: Math.round(speed()) }),
+    test: k => power(k),
     down(x) { touched = true; pad.tx = x; }, move(x) { pad.tx = x; },
-    up() { if (stuck && clearT < 0) { stuck = false; const s = speed(), ang = (Math.random() - .5) * .6; ball.vx = Math.sin(ang) * s; ball.vy = -Math.cos(ang) * s; a.fx.snap(); } },
+    up() { if (stuck && clearT < 0) { stuck = false; launch(balls[0], (Math.random() - .5) * .6); a.fx.snap(); } },
     update(dt) {
+      for (const k in on) { on[k] -= dt; if (on[k] <= 0) { delete on[k]; if (k === 'slow') balls.forEach(resize); } }
+      pad.tw = on.big > 0 ? 168 : 104; pad.w += (pad.tw - pad.w) * Math.min(1, dt * 8);
       pad.x += (Math.max(pad.w / 2, Math.min(W - pad.w / 2, pad.tx)) - pad.x) * Math.min(1, dt * 18);
-      if (clearT >= 0) { clearT += dt; if (clearT > 2.2) { clearT = -1; level++; build(); newBall(); } return; }
-      if (stuck) { ball.x = pad.x; ball.y = PY - 18; return; }
+      sparks = sparks.filter(s => (s.t += dt) < .5);
+      // falling power-ups
+      for (const c of caps) { c.y += 95 * dt; if (!c.got && c.y > PY - 12 && c.y < PY + 12 && Math.abs(c.x - pad.x) < pad.w / 2 + 14) { c.got = true; power(c.k); } }
+      caps = caps.filter(c => !c.got && c.y < H + 20);
+      if (clearT >= 0) { clearT += dt; if (clearT > 2.2) { clearT = -1; level++; boost = 0; caps = []; on = {}; build(); newBall(); show(); } return; }
+      if (stuck) { balls[0].x = pad.x; balls[0].y = PY - 18; return; }
       const steps = 4;
-      for (let i = 0; i < steps; i++) {
-        const d = dt / steps; ball.x += ball.vx * d; ball.y += ball.vy * d;
-        if (ball.x < ball.r) { ball.x = ball.r; ball.vx = Math.abs(ball.vx); a.fx.tick(); }
-        if (ball.x > W - ball.r) { ball.x = W - ball.r; ball.vx = -Math.abs(ball.vx); a.fx.tick(); }
-        if (ball.y < ball.r) { ball.y = ball.r; ball.vy = Math.abs(ball.vy); a.fx.tick(); }
-        // the paddle: where the ball lands on it sets the bounce angle
-        if (ball.vy > 0 && ball.y + ball.r >= PY - 7 && ball.y < PY + 6 && Math.abs(ball.x - pad.x) < pad.w / 2 + ball.r) {
-          const off = Math.max(-1, Math.min(1, (ball.x - pad.x) / (pad.w / 2))), s = speed();
-          // never straight up (it could bounce up and down an empty column forever), and a little different each time
+      for (const b of balls) for (let i = 0; i < steps && !b.gone; i++) {
+        const d = dt / steps; b.x += b.vx * d; b.y += b.vy * d;
+        if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx); a.fx.tick(); }
+        if (b.x > W - b.r) { b.x = W - b.r; b.vx = -Math.abs(b.vx); a.fx.tick(); }
+        if (b.y < b.r) { b.y = b.r; b.vy = Math.abs(b.vy); a.fx.tick(); }
+        // the paddle: where the ball lands on it sets the bounce angle (never straight up, so it can't get stuck in an empty column)
+        if (b.vy > 0 && b.y + b.r >= PY - 7 && b.y < PY + 6 && Math.abs(b.x - pad.x) < pad.w / 2 + b.r) {
+          const off = Math.max(-1, Math.min(1, (b.x - pad.x) / (pad.w / 2)));
           let ang = off * 1.05 + (Math.random() - .5) * .16; if (Math.abs(ang) < .22) ang = (ang < 0 || (ang === 0 && Math.random() < .5) ? -1 : 1) * (.22 + Math.random() * .1);
-          ball.vx = Math.sin(ang) * s; ball.vy = -Math.abs(Math.cos(ang) * s); ball.y = PY - 7 - ball.r; a.fx.place();
+          launch(b, ang); b.y = PY - 7 - b.r; a.fx.place();
         }
+        // the safety net
+        if (on.net > 0 && b.vy > 0 && b.y + b.r >= NET_Y) { b.y = NET_Y - b.r; b.vy = -Math.abs(b.vy); a.fx.boing(); }
         for (let k = bricks.length - 1; k >= 0; k--) {
-          const b = bricks[k], cx = Math.max(b.x, Math.min(ball.x, b.x + b.w)), cy = Math.max(b.y, Math.min(ball.y, b.y + b.h));
-          if ((ball.x - cx) ** 2 + (ball.y - cy) ** 2 <= ball.r * ball.r) {
-            bricks.splice(k, 1); broke++; a.score(`🧱 ${broke}`); a.fx.count(Math.min(9, k % 10));
-            const ox = Math.min(ball.x + ball.r - b.x, b.x + b.w - (ball.x - ball.r)), oy = Math.min(ball.y + ball.r - b.y, b.y + b.h - (ball.y - ball.r));
-            if (ox < oy) ball.vx = -ball.vx; else ball.vy = -ball.vy;
-            break;
+          const br = bricks[k], cx = Math.max(br.x, Math.min(b.x, br.x + br.w)), cy = Math.max(br.y, Math.min(b.y, br.y + br.h));
+          if ((b.x - cx) ** 2 + (b.y - cy) ** 2 <= b.r * b.r) {
+            const fire = on.fire > 0;
+            if (!fire) { const ox = Math.min(b.x + b.r - br.x, br.x + br.w - (b.x - b.r)), oy = Math.min(b.y + b.r - br.y, br.y + br.h - (b.y - b.r)); if (ox < oy) b.vx = -b.vx; else b.vy = -b.vy; }
+            br.hp -= fire ? 2 : 1;
+            if (br.hp > 0) { a.fx.tick(); br.cracked = true; break; }
+            bricks.splice(k, 1); broke++; boost = Math.min(70, boost + 1.2); show(); a.fx.count(Math.min(9, k % 10));
+            for (let s = 0; s < 5; s++) sparks.push({ x: br.x + br.w / 2, y: br.y + br.h / 2, vx: (Math.random() - .5) * 160, vy: (Math.random() - .5) * 160, c: br.c, t: 0 });
+            if (br.star || Math.random() < .14) { const ks = Object.keys(POWERS); caps.push({ x: br.x + br.w / 2, y: br.y + br.h / 2, k: ks[Math.floor(Math.random() * ks.length)] }); }
+            balls.forEach(resize);
+            if (!fire) break;
           }
         }
+        if (b.y > H + 20) b.gone = true;
+        if (bricks.length && bricks.length <= 3 && b.vy < 0) { let n = bricks[0], nd = 1e9; for (const br of bricks) { const dd = Math.abs(br.x + br.w / 2 - b.x); if (dd < nd) { nd = dd; n = br; } } const want = Math.sign(n.x + n.w / 2 - b.x) * Math.min(1, nd / 60), s = Math.hypot(b.vx, b.vy); b.vx += want * s * .9 * d; const m = Math.hypot(b.vx, b.vy); b.vx *= s / m; b.vy *= s / m; if (Math.abs(b.vy) < s * .45) { b.vy = -s * .45; b.vx = Math.sign(b.vx) * s * Math.sqrt(1 - .45 * .45); } }
       }
-      if (ball.y > H + 20) { newBall(); a.fx.wrong(); missT -= 1; if (missT <= 0) { missT = 3; a.say('ar_oops'); } }
-      if (!bricks.length) { clearT = 0; a.fx.win(); a.say('ar_clear'); a.msg('You broke them all! 🎉', 2000); }
+      if (balls.some(b => b.gone)) {
+        balls = balls.filter(b => !b.gone);
+        if (!balls.length) { newBall(); a.fx.wrong(); missT -= 1; if (missT <= 0) { missT = 3; a.say('ar_oops'); } }
+      }
+      if (!bricks.length) { clearT = 0; caps = []; a.fx.win(); a.say('ar_clear'); a.msg(`Level ${level + 1} cleared! 🎉`, 2000); }
     },
     draw() {
       const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#1d2a5a'); bg.addColorStop(1, '#2d1d5a'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
       g.strokeStyle = 'rgba(255,255,255,.05)'; g.lineWidth = 1; for (let x = 0; x < W; x += 24) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
-      for (const b of bricks) { g.fillStyle = b.c; arcRound(g, b.x, b.y, b.w, b.h, 5); g.fill(); g.fillStyle = 'rgba(255,255,255,.35)'; arcRound(g, b.x + 3, b.y + 3, b.w - 6, 5, 2.5); g.fill(); }
-      g.fillStyle = '#fff'; arcRound(g, pad.x - pad.w / 2, PY - 7, pad.w, 14, 7); g.fill(); g.fillStyle = '#4ab3ff'; arcRound(g, pad.x - pad.w / 2 + 6, PY - 3, pad.w - 12, 6, 3); g.fill();
-      g.shadowColor = '#fff6c0'; g.shadowBlur = 12; g.fillStyle = '#ffe27a'; g.beginPath(); g.arc(ball.x, ball.y, ball.r, 0, 7); g.fill(); g.shadowBlur = 0;
+      for (const b of bricks) {
+        g.fillStyle = b.hp > 1 ? '#8a8aa0' : b.c; arcRound(g, b.x, b.y, b.w, b.h, 5); g.fill();
+        g.fillStyle = 'rgba(255,255,255,.35)'; arcRound(g, b.x + 3, b.y + 3, b.w - 6, 5, 2.5); g.fill();
+        if (b.hp > 1) { g.strokeStyle = '#d0d0e0'; g.lineWidth = 2; arcRound(g, b.x + 1, b.y + 1, b.w - 2, b.h - 2, 5); g.stroke(); }
+        if (b.cracked) { g.strokeStyle = 'rgba(30,20,50,.6)'; g.lineWidth = 2; g.beginPath(); g.moveTo(b.x + b.w * .3, b.y + 2); g.lineTo(b.x + b.w * .45, b.y + b.h * .6); g.lineTo(b.x + b.w * .62, b.y + b.h - 2); g.stroke(); }
+        if (b.star) { const tw = .6 + .4 * Math.sin(performance.now() / 180); g.strokeStyle = `rgba(255,236,120,${tw})`; g.lineWidth = 3; arcRound(g, b.x - 1, b.y - 1, b.w + 2, b.h + 2, 6); g.stroke(); arcStar(g, b.x + b.w / 2, b.y + b.h / 2 + 1, 8, '#fff6c0'); }
+      }
+      for (const s of sparks) { g.globalAlpha = 1 - s.t / .5; g.fillStyle = s.c; g.fillRect(s.x + s.vx * s.t - 3, s.y + s.vy * s.t - 3, 6, 6); } g.globalAlpha = 1;
+      for (const c of caps) { const P = POWERS[c.k]; g.fillStyle = P.c; arcRound(g, c.x - 20, c.y - 12, 40, 24, 12); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2.5; g.stroke(); arcEmoji(g, P.ic, c.x, c.y + 1, 16); }
+      if (on.net > 0) { g.globalAlpha = on.net < 2 ? .4 + .4 * Math.sin(performance.now() / 80) : .9; g.fillStyle = '#9a6bff'; g.fillRect(0, NET_Y, W, 5); g.globalAlpha = 1; }
+      g.fillStyle = on.big > 0 ? '#ffe27a' : '#fff'; arcRound(g, pad.x - pad.w / 2, PY - 7, pad.w, 14, 7); g.fill(); g.fillStyle = '#4ab3ff'; arcRound(g, pad.x - pad.w / 2 + 6, PY - 3, pad.w - 12, 6, 3); g.fill();
+      const fire = on.fire > 0;
+      for (const b of balls) { g.shadowColor = fire ? '#ff6a00' : '#fff6c0'; g.shadowBlur = fire ? 18 : 12; g.fillStyle = fire ? '#ff9f1c' : '#ffe27a'; g.beginPath(); g.arc(b.x, b.y, b.r, 0, 7); g.fill(); g.shadowBlur = 0; }
+      // the power-ups that are on, with how long they have left
+      let px = 10; for (const k in on) { const P = POWERS[k]; g.fillStyle = 'rgba(0,0,0,.4)'; arcRound(g, px, 6, 66, 30, 15); g.fill(); arcEmoji(g, P.ic, px + 16, 21, 19); g.fillStyle = P.c; arcRound(g, px + 32, 18, 28 * Math.max(0, on[k] / P.t), 7, 3.5); g.fill(); px += 72; }
       if (stuck && clearT < 0) arcText(g, touched ? 'Tap to launch! 🚀' : '👆 Slide to move, tap to launch', W / 2, H / 2 + 50, 20, '#ffe27a');
     },
   };
