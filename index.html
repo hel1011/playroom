@@ -8903,9 +8903,9 @@ function drShot(c) {
       },
     });
     async function out() {
-      c.noHand(); await c.say('dr_sh_out');
+      c.noHand(); const said = c.say('dr_sh_out');   // the needle comes out while Pip talks
       const x0 = tx; await c.tween(k => { tx = x0 + 70 * k; place(); }, 500);
-      c.$('#shDot').setAttribute('opacity', 1); await c.wait(700);
+      c.$('#shDot').setAttribute('opacity', 1); await Promise.all([said, c.wait(700)]);
       await c.tween(k => z.setAttribute('opacity', 1 - k), 300); z.remove(); stepN = 3; bandage();
     }
   }
