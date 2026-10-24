@@ -8882,7 +8882,7 @@ function arcUnicorn(a) {
     else foe('cloud', w, 0, { keep: 34, life: 9 });
   }
   function ride() {
-    Lnd = UNI_LANDS[land % UNI_LANDS.length]; level = land > 0 ? 'hard' : 'easy';
+    Lnd = UNI_LANDS[land % UNI_LANDS.length]; level = land > 2 ? 'hard' : 'easy';   // the first three places keep the small numbers and two-door gates
     seg = []; const N = FIN + DRAW + 400;   // plenty of path past the finish: the boss fight happens while you keep riding
     const addS = (n, c) => { for (let k = 0; k < n && seg.length < N; k++) seg.push({ c: c * Math.sin(Math.PI * k / n) }); };
     addS(30, 0); while (seg.length < FIN + 10) addS(26 + Math.floor(Math.random() * 26), pick([-1.6, -.9, 0, 0, .9, 1.6])); while (seg.length < N) seg.push({ c: 0 });
@@ -8930,12 +8930,13 @@ function arcUnicorn(a) {
     shots = shots.filter(s => s.t < 1.3);
     for (const p of sparks) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; } sparks = sparks.filter(p => p.t < .7);
     for (const f of floats) f.t += dt; floats = floats.filter(f => f.t < 1.4);
-    const want = done ? 3 : hurtT > .6 ? 7 : boss ? 11 : (14 + (level === 'hard' ? 2 : 0)) * (boostT > 0 ? 1.5 : 1);
+    const gateNear = objs.some(o => o.k === 'gate' && !o.passed && o.w - pos < 80);   // slow right down for a gate, so there's time to read it and steer
+    const want = done ? 3 : hurtT > .6 ? 7 : boss ? 10 : gateNear ? 6.5 : (12 + (level === 'hard' ? 1.5 : 0)) * (boostT > 0 ? 1.5 : 1);
     speed += (want - speed) * Math.min(1, dt * 1.8); pos += speed * dt;
     const i0 = Math.floor(pos / SEG); bgX += seg[Math.min(seg.length - 1, i0)].c * speed * dt * .35;
     x += (wantX - x) * Math.min(1, dt * 8);
     // gates and troublemakers along the way, then the boss
-    if (!boss && gates > 0 && pos > nextGate) { const gt = makeGate(); objs.push({ k: 'gate', w: pos + 60, ...gt, passed: false }); gates--; nextGate = pos + 150 + Math.random() * 40; nextFoe = Math.max(nextFoe, pos + 40); say(firstGate ? 'uni_gates' : gt.say, true); if (firstGate) { firstGate = false; setTimeout(() => { if (document.querySelector('.arc-unicorn')) say(gt.say, true); }, 2600); } }
+    if (!boss && gates > 0 && pos > nextGate) { const gt = makeGate(); objs.push({ k: 'gate', w: pos + 70, ...gt, passed: false }); gates--; nextGate = pos + 150 + Math.random() * 40; nextFoe = Math.max(nextFoe, pos + 40); say(firstGate ? 'uni_gates' : gt.say, true); if (firstGate) { firstGate = false; setTimeout(() => { if (document.querySelector('.arc-unicorn')) say(gt.say, true); }, 2600); } }
     if (!boss && pos > nextFoe && pos < FIN * SEG - 60 && !objs.some(o => o.k === 'gate' && o.w - pos < 70 && o.w - pos > -5)) { wave(); nextFoe = pos + Math.max(26, 40 - land * 1.5) + Math.random() * 25; }
     if (!boss && !done && pos > FIN * SEG && !objs.some(o => o.k === 'gate' && o.w > pos)) startBoss();
     for (const o of objs) {
