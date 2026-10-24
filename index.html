@@ -614,6 +614,9 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .arc { position: absolute; inset: 0; z-index: 60; display: flex; flex-direction: column; background: #141026; border-radius: inherit; animation: plop .3s cubic-bezier(.3,1.4,.5,1); }
 .arc-top { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; padding: 8px 10px 6px 16px; color: #fff; font: 800 20px/1 var(--f-display); }
 .arc-score { margin-left: auto; background: rgba(255,255,255,.12); border-radius: 99px; padding: 7px 14px; font-size: 18px; }
+.arc-mus { border: 0; width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,.14); font-size: 20px; cursor: pointer; margin-right: 8px; position: relative; }
+.arc-mus[aria-pressed="false"] { opacity: .45; }
+.arc-mus[aria-pressed="false"]::after { content: ''; position: absolute; left: 8px; right: 8px; top: 50%; height: 3px; background: #ff5a4e; transform: rotate(-35deg); border-radius: 2px; }
 .arc-x { border: 0; width: 46px; height: 46px; border-radius: 50%; background: #ff5a4e; color: #fff; font: 800 22px/1 var(--f-display); box-shadow: 0 4px 0 #b83a32; cursor: pointer; }
 .arc-stage { position: relative; flex: 1 1 auto; min-height: 0; display: grid; place-items: center; padding: 0 8px 8px; }
 .arc-cv { display: block; border-radius: 16px; touch-action: none; user-select: none; -webkit-user-select: none; box-shadow: 0 0 0 4px rgba(255,255,255,.08); }
@@ -1831,9 +1834,120 @@ const Sound = (() => {
   function guitarWarm(fs, bright = .5) { const c = ac(); if (!c) return; fs.forEach(f => ksBuf(c, f, bright)); }
   function guitarFree() { ksCache.clear(); }   // hand the string sounds' memory back when leaving the game
   function now() { const c = ac(); return c ? c.currentTime : 0; }
+  // ---- background music for the arcade games: little made-up tunes played live by simple synthesizers (no recordings).
+  // A song is a style (speed, key, chords, instruments, drum and bass patterns) plus a seed that writes its melody.
+  // It goes quiet while Pip talks, and follows the Sounds switch and the game's own 🎵 button. ----
+  let mGain = null, musicOn = store.get('pr-music', true), song = null, mTimer = 0, mNoise = null, lastStyle = null;
+  const SCALES = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10], dorian: [0, 2, 3, 5, 7, 9, 10], mixo: [0, 2, 4, 5, 7, 9, 10], lydian: [0, 2, 4, 6, 7, 9, 11], harm: [0, 2, 3, 5, 7, 8, 11] };
+  const DRUMS = {
+    gallop: { block: 'x..x..x.x..x..x.', k: 'x.......x.......', h: '..x...x...x...x.' },
+    pop: { k: 'x.......x.x.....', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.' },
+    drive: { k: 'x...x...x...x...', s: '....x.......x...', h: 'xxxxxxxxxxxxxxxx' },
+    march: { k: 'x...x...x...x...', s: '....x..x....x.xx' },
+    calypso: { k: 'x..x..x.x..x..x.', s: '....x.......x...', sh: 'x.xxx.xxx.xxx.xx' },
+    western: { k: 'x.......x.......', s: '....x.......x...', h: '..x...x...x...x.' },
+    lullaby: { sh: 'x...x...x...x...' },
+    shuffle: { k: 'x.....x.x.......', s: '....x.......x...', h: 'x..x..x.x..x..x.' },
+    sleigh: { k: 'x.......x.......', s: '....x.......x...', jingle: 'x.x.x.x.x.x.x.x.' },
+    synthwave: { k: 'x...x...x...x...', s: '....x.......x...', h: '..x...x...x...x.' },
+  };
+  const BASS = { gallop: 'r..r....f..f....', pop: 'r.....r.r.....f.', drive: 'r.r.r.r.r.r.r.r.', walk: 'r...3...f...o...', boom: 'r.......f.......', calypso: 'r..r..f.r..r..f.', lullaby: 'r...............', synth: 'r.ror.ror.ror.ro' };
+  function mbus() { const c = ac(); if (!c) return null; if (!mGain) { mGain = c.createGain(); mGain.gain.value = 0; mGain.connect(c.destination); } return c; }
+  const hz = n => 440 * Math.pow(2, (n - 69) / 12);
+  function noiseB(c) { if (!mNoise) { mNoise = c.createBuffer(1, c.sampleRate * .5, c.sampleRate); const d = mNoise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } return mNoise; }
+  // one note that rings and fades (bells, plucks, drums)
+  function ping(c, type, f, t, vol, a, dec, filt) {
+    const o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + a); g.gain.exponentialRampToValueAtTime(.0004, t + a + dec);
+    let n = o; if (filt) { const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = filt; o.connect(fl); n = fl; } n.connect(g).connect(mGain); o.start(t); o.stop(t + a + dec + .05); return o;
+  }
+  // one note that holds, then lets go (flute, brass, pads, leads)
+  function hold(c, type, f, t, len, vol, a, rel, filt, det = 0, vib = 0) {
+    const o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.value = f; o.detune.value = det;
+    if (vib) { const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = 5.2; lg.gain.value = vib; l.connect(lg).connect(o.detune); l.start(t); l.stop(t + len + rel + .1); }
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + a); g.gain.setValueAtTime(vol, t + Math.max(a, len)); g.gain.exponentialRampToValueAtTime(.0004, t + Math.max(a, len) + rel);
+    let n = o; if (filt) { const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = filt; fl.Q.value = 2; o.connect(fl); n = fl; } n.connect(g).connect(mGain); o.start(t); o.stop(t + Math.max(a, len) + rel + .05);
+  }
+  function inst(c, name, n, t, len, v) {
+    const f = hz(n);
+    switch (name) {
+      case 'bell': ping(c, 'sine', f, t, v, .002, 1.1); ping(c, 'sine', f * 2.76, t, v * .22, .002, .3); ping(c, 'sine', f * 5.4, t, v * .08, .002, .12); break;
+      case 'marimba': ping(c, 'sine', f, t, v, .003, .45); ping(c, 'sine', f * 4, t, v * .14, .002, .07); break;
+      case 'pluck': ping(c, 'triangle', f, t, v, .003, .35); ping(c, 'sawtooth', f, t, v * .3, .002, .14, 2600); break;
+      case 'banjo': ping(c, 'sawtooth', f, t, v * .5, .002, .22, 3600); ping(c, 'triangle', f * 2, t, v * .25, .002, .1); break;
+      case 'steel': ping(c, 'sine', f, t, v, .004, .55); ping(c, 'sine', f * 2, t, v * .35, .004, .3); ping(c, 'sine', f * 3.01, t, v * .12, .003, .18); break;
+      case 'square': hold(c, 'square', f, t, len * .85, v * .45, .008, .06, 2200, 0, 6); break;
+      case 'saw': hold(c, 'sawtooth', f, t, len * .9, v * .4, .01, .1, 1700, -6); hold(c, 'sawtooth', f, t, len * .9, v * .3, .01, .1, 1700, 7); break;
+      case 'flute': hold(c, 'sine', f, t, len * .9, v * .8, .05, .12, 0, 0, 9); hold(c, 'triangle', f * 2, t, len * .9, v * .06, .05, .1); break;
+      case 'brass': hold(c, 'sawtooth', f, t, len * .85, v * .45, .03, .1, 1400); hold(c, 'square', f / 2, t, len * .85, v * .1, .03, .1, 900); break;
+      case 'pad': hold(c, 'sawtooth', f, t, len, v * .16, .35, .6, 900, -9); hold(c, 'sawtooth', f, t, len, v * .16, .35, .6, 900, 9); break;
+      case 'bass': ping(c, 'triangle', f, t, v, .005, Math.min(.5, len + .1)); ping(c, 'sine', f, t, v * .6, .005, Math.min(.4, len)); break;
+      case 'synthbass': hold(c, 'sawtooth', f, t, len * .8, v * .55, .005, .05, 520); break;
+    }
+  }
+  function drum(c, kind, t, v) {
+    const nz = (type, fq, dec, vol, q = 1) => { const s = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain(); s.buffer = noiseB(c); fl.type = type; fl.frequency.value = fq; fl.Q.value = q; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0004, t + dec); s.connect(fl).connect(g).connect(mGain); s.start(t); s.stop(t + dec + .02); };
+    if (kind === 'k') { const o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(45, t + .12); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.0004, t + .26); o.connect(g).connect(mGain); o.start(t); o.stop(t + .3); }
+    else if (kind === 's') { nz('bandpass', 1800, .14, v * .55, .8); ping(c, 'triangle', 190, t, v * .3, .001, .07); }
+    else if (kind === 'h') nz('highpass', 7500, .035, v * .2);
+    else if (kind === 'sh') nz('bandpass', 6000, .05, v * .18, 1.5);
+    else if (kind === 'jingle') { nz('highpass', 8000, .12, v * .25); ping(c, 'sine', 5400, t, v * .04, .001, .1); ping(c, 'sine', 6300, t + .02, v * .03, .001, .08); }
+    else if (kind === 'block') { ping(c, 'sine', 880, t, v * .25, .001, .05); ping(c, 'sine', 1320, t, v * .12, .001, .03); }
+  }
+  // write a melody for a style: two four-bar phrases, the second answering the first and ending at home
+  function compose(st) {
+    let a = st.seed * 9301 + 49297; const rnd = () => (a = (a * 9301 + 49297) % 233280) / 233280;
+    const sc = SCALES[st.mode], deg = i => st.root + sc[((i % 7) + 7) % 7] + 12 * Math.floor(i / 7);
+    const chordOf = b => { const d = st.prog[b % st.prog.length]; return [d, d + 2, d + 4]; };
+    const bars = [], dens = st.dens || .6; let idx = 4;
+    for (let b = 0; b < 4; b++) {
+      const ch = chordOf(b), notes = [];
+      for (let s = 0; s < 16; s += 2) {
+        if (s > 0 && rnd() > dens + (s % 4 === 0 ? .2 : 0)) continue;
+        if (s % 4 === 0) { const tgt = ch.map(d => d + 7 * Math.round((idx - d) / 7)); idx = tgt.reduce((p, q) => Math.abs(q - idx) < Math.abs(p - idx) ? q : p); }
+        else idx += pick([-2, -1, -1, 1, 1, 2]);
+        idx = Math.max(0, Math.min(11, idx)); notes.push([s, idx]);
+      }
+      bars.push(notes);
+    }
+    const end = []; for (const [s, i] of bars[3]) if (s < 8) end.push([s, i]); end.push([8, 7]);   // the answer lands on the home note
+    const mel = bars.concat([bars[0], bars[1], bars[2], end]);
+    return { mel, deg, chordOf };
+  }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function startSong(st) {
+    stopSong(); lastStyle = st; const c = mbus(); if (!c || !st) return;
+    const comp = compose(st), stepDur = 60 / st.bpm / 4;
+    song = { st, comp, stepDur, step: 0, next: c.currentTime + .15 };
+    mGain.gain.cancelScheduledValues(c.currentTime); mGain.gain.setValueAtTime(mGain.gain.value, c.currentTime);
+    const tick = () => {
+      if (!song) return; const cc = ctx, on = musicOn && sfxOn && !document.hidden;
+      mGain.gain.setTargetAtTime(on ? (curRes ? .08 : .26) * (st.vol || 1) : 0, cc.currentTime, .25);   // quieter while Pip talks
+      while (song && song.next < cc.currentTime + .3) {
+        const s = song.step, t = song.next, bar = Math.floor(s / 16) % 8, i = s % 16, ch = comp.chordOf(bar), drums = DRUMS[st.drums] || {}, bp = BASS[st.bass] || BASS.pop;
+        if (on) {
+          for (const k in drums) if (drums[k][i] === 'x') drum(cc, k, t, .5);
+          const b = bp[i]; if (b !== '.') { const d = b === 'f' ? ch[0] + 4 : b === '3' ? ch[0] + 2 : ch[0]; inst(cc, st.bassInst || 'bass', comp.deg(d) - 24 + (b === 'o' ? 12 : 0), t, stepDur * 2, .42); }
+          if (st.chords) { if (st.chords.pat ? st.chords.pat[i] === 'x' : i === 0) for (const d of ch) inst(cc, st.chords.inst, comp.deg(d) - 12, t, st.chords.pat ? stepDur * 2 : stepDur * 16, st.chords.pat ? .2 : .5); }
+          if (st.arp && i % 2 === 0) inst(cc, st.arp.inst, comp.deg(ch[(i / 2) % 3]) + (st.arp.oct || 0), t, stepDur * 2, .14);
+          const notes = comp.mel[bar], k = notes.findIndex(n => n[0] === i);
+          if (k >= 0) { const nx = k + 1 < notes.length ? notes[k + 1][0] : 16; inst(cc, st.mel, comp.deg(notes[k][1]) + (st.melOct || 0), t, (nx - i) * stepDur, .34); }
+        }
+        song.step++; song.next += stepDur * (st.swing ? (i % 2 ? 1 - st.swing : 1 + st.swing) : 1);
+      }
+    };
+    tick(); mTimer = setInterval(tick, 70);
+  }
+  function stopSong() { clearInterval(mTimer); mTimer = 0; song = null; if (mGain && ctx) { mGain.gain.cancelScheduledValues(ctx.currentTime); mGain.gain.setTargetAtTime(0, ctx.currentTime, .08); } }
+  // a short "you did it" tune
+  function jingle() { stopSong(); const c = mbus(); if (!c || !musicOn || !sfxOn) return; const t = c.currentTime + .05; mGain.gain.cancelScheduledValues(t); mGain.gain.setValueAtTime(.22, t);
+    [[72, 0], [76, .12], [79, .24], [84, .36], [79, .6], [84, .72]].forEach(([n, d]) => { inst(c, 'brass', n, t + d, d > .5 ? .5 : .14, .4); inst(c, 'bell', n + 12, t + d, .2, .2); });
+    drum(c, 'k', t, .5); drum(c, 's', t + .36, .5); drum(c, 'k', t + .72, .5); }
   const api = {
     onStart: null,
     unlock, wake, say, stopVoice, preload, fx, piano, beep, guitar, guitarWarm, guitarFree, now,
+    music(st) { if (st) startSong(st); else stopSong(); }, jingle, get musicPlaying() { return !!song; },
+    get musicOn() { return musicOn; }, set musicOn(v) { musicOn = v; store.set('pr-music', v); },
     memSeconds() { return Object.values(clips).reduce((t, e) => t + (e.v ? e.v.buf.duration : 0), 0); },
     memBytes() { return Object.values(files).reduce((t, e) => t + (e.v ? e.v.ab.byteLength : 0), 0); },
     _clip: load,   // for testing
@@ -1846,6 +1960,7 @@ const Sound = (() => {
 window.__playroomAudioSeconds = () => Sound.memSeconds();   // for testing: how much decoded audio is held
 window.__playroomClip = id => Sound._clip(id);   // for testing: one decoded line
 window.__playroomSay = (ids, stop) => stop ? Sound.stopVoice() : Sound.say(ids);   // for testing: speak or stop
+window.__music = () => ({ playing: Sound.musicPlaying, on: Sound.musicOn });   // for testing
 window.__sprites = SPRITES;
 function caption(t) { document.querySelectorAll('.caption').forEach(c => { c.textContent = t; }); }
 document.querySelectorAll('svg.pip').forEach(el => { el.innerHTML = PIP_ART; });
@@ -4907,19 +5022,42 @@ const ROOM_BG_BIG = `<svg class="tree-bg room big" viewBox="0 0 400 300" preserv
 
 /* =================== Arcade games (cabinets in Pip's treehouse) =================== */
 // Four little games, each drawn on a canvas 480 by 360 (scaled to fit the screen). Nothing to lose: no game over, just play again.
+// ---- background music for each place in the arcade games (see Sound.music) ----
+const MUSIC = {
+  uni: [
+    { bpm: 122, root: 72, mode: 'major', prog: [0, 4, 5, 3], mel: 'bell', drums: 'gallop', bass: 'gallop', chords: { inst: 'pad' }, seed: 11 },   // Candy Meadow: a galloping music box
+    { bpm: 100, root: 65, mode: 'lydian', prog: [0, 1, 0, 4], mel: 'bell', melOct: 12, arp: { inst: 'bell', oct: 12 }, drums: 'lullaby', bass: 'lullaby', chords: { inst: 'pad' }, seed: 23 },   // Crystal Forest: sparkly and still
+    { bpm: 112, root: 67, mode: 'mixo', prog: [0, 6, 3, 0], mel: 'marimba', drums: 'gallop', bass: 'walk', chords: { inst: 'pluck', pat: '..x...x...x...x.' }, seed: 37 },   // Sunset Kingdom: warm marimba
+    { bpm: 96, root: 62, mode: 'major', prog: [0, 5, 3, 4], mel: 'flute', arp: { inst: 'bell', oct: 12 }, drums: 'lullaby', bass: 'lullaby', chords: { inst: 'pad' }, seed: 41 },   // Rainbow Clouds: a floaty flute
+    { bpm: 124, root: 64, mode: 'dorian', prog: [0, 3, 6, 0], mel: 'pluck', swing: .2, drums: 'shuffle', bass: 'walk', chords: { inst: 'marimba', pat: '....x.......x...' }, seed: 53 },   // Mushroom Woods: tiptoe and bounce
+    { bpm: 116, root: 65, mode: 'major', prog: [0, 3, 4, 0], mel: 'steel', drums: 'calypso', bass: 'calypso', chords: { inst: 'steel', pat: '..x..x....x..x..' }, seed: 61 },   // Seashell Shore: steel drums
+    { bpm: 138, root: 62, mode: 'harm', prog: [0, 5, 6, 4], mel: 'square', drums: 'drive', bass: 'drive', bassInst: 'synthbass', chords: { inst: 'pad' }, seed: 71 },   // Fire Mountain: fast and fiery
+    { bpm: 80, root: 70, mode: 'major', prog: [0, 5, 3, 4], mel: 'bell', arp: { inst: 'bell', oct: 12 }, drums: 'lullaby', bass: 'lullaby', chords: { inst: 'pad' }, seed: 83, vol: .9 },   // Starry Night: a lullaby
+    { bpm: 126, root: 67, mode: 'major', prog: [0, 3, 0, 4], mel: 'banjo', swing: .18, drums: 'western', bass: 'boom', chords: { inst: 'banjo', pat: '....x.......x...' }, seed: 97 },   // Honey Hills: a banjo hoedown
+    { bpm: 116, root: 60, mode: 'major', prog: [0, 3, 4, 0], mel: 'brass', drums: 'march', bass: 'walk', chords: { inst: 'bell', pat: 'x...x...x...x...' }, seed: 101 },   // Gumdrop Castle: a royal march
+  ],
+  boss: land => ({ bpm: 148, root: 62 + (land % 5), mode: 'harm', prog: [0, 0, 5, 4], mel: 'saw', drums: 'drive', bass: 'drive', bassInst: 'synthbass', chords: { inst: 'pad' }, seed: 7 + land }),
+  race: [
+    { bpm: 136, root: 67, mode: 'major', prog: [0, 4, 5, 3], mel: 'square', drums: 'pop', bass: 'pop', chords: { inst: 'pluck', pat: '..x...x...x...x.' }, seed: 5 },   // Sunny Meadow: bright and bouncy
+    { bpm: 108, root: 64, mode: 'harm', prog: [0, 5, 6, 4], mel: 'pluck', drums: 'western', bass: 'boom', chords: { inst: 'pluck', pat: 'x.....x.x.......' }, seed: 13, vol: 1.5 },   // Desert Canyon: a twangy western
+    { bpm: 128, root: 65, mode: 'major', prog: [0, 3, 4, 0], mel: 'bell', drums: 'sleigh', bass: 'walk', chords: { inst: 'pad' }, seed: 17 },   // Snowy Mountain: sleigh bells
+    { bpm: 122, root: 67, mode: 'major', prog: [0, 3, 4, 3], mel: 'steel', drums: 'calypso', bass: 'calypso', chords: { inst: 'marimba', pat: '..x..x....x..x..' }, seed: 19 },   // Beach Road: island steel drums
+    { bpm: 116, root: 69, mode: 'minor', prog: [0, 5, 2, 6], mel: 'saw', arp: { inst: 'pluck' }, drums: 'synthwave', bass: 'synth', bassInst: 'synthbass', chords: { inst: 'pad' }, seed: 29 },   // Night City: neon synths
+  ],
+};
 const ARC_GAMES = {
   lunar: { title: 'Moon Landing', icon: '🚀', how: 'ar_lunar_how', make: arcLunar },
-  race: { title: 'Turbo Race', icon: '🏎️', how: 'ar_race_how', make: arcRace },
+  race: { title: 'Turbo Race', icon: '🏎️', how: 'ar_race_how', make: arcRace, music: true },
   kick: { title: 'Free Kick', icon: '⚽', how: 'ar_kick_how', make: arcKick },
   bricks: { title: 'Brick Breaker', icon: '🧱', how: 'ar_bricks_how', make: arcBricks },
   skee: { title: 'Skee-Ball', icon: SKEE_ICON, how: 'ar_skee_how', make: arcSkee },
   pong: { title: 'Table Tennis', icon: '🏓', how: 'ar_pong_how', make: arcPong },
-  unicorn: { title: 'Unicorn Ride', icon: '🦄', how: 'uni_intro', make: arcUnicorn },
+  unicorn: { title: 'Unicorn Ride', icon: '🦄', how: 'uni_intro', make: arcUnicorn, music: true },
 };
 function openArcade(kind, host, onClose) {
   const G = ARC_GAMES[kind]; Sound.stopVoice();
   const wrap = document.createElement('div'); wrap.className = 'arc arc-' + kind;
-  wrap.innerHTML = `<div class="arc-top"><b>${G.icon} ${G.title}</b><span class="arc-score"></span><button type="button" class="arc-x" aria-label="Back to the treehouse">✕</button></div>
+  wrap.innerHTML = `<div class="arc-top"><b>${G.icon} ${G.title}</b><span class="arc-score"></span>${G.music ? `<button type="button" class="arc-mus" aria-label="Music" aria-pressed="${Sound.musicOn}">🎵</button>` : ''}<button type="button" class="arc-x" aria-label="Back to the treehouse">✕</button></div>
     <div class="arc-stage"><canvas class="arc-cv"></canvas><div class="arc-msg" hidden></div></div>`;
   host.appendChild(wrap);
   const cv = wrap.querySelector('canvas'), g = cv.getContext('2d'), stage = wrap.querySelector('.arc-stage'), msgEl = wrap.querySelector('.arc-msg'), scoreEl = wrap.querySelector('.arc-score');
@@ -4955,8 +5093,10 @@ function openArcade(kind, host, onClose) {
   raf = requestAnimationFrame(frame);
   function close() {
     if (!alive) return; alive = false; cancelAnimationFrame(raf); ro.disconnect(); clearTimeout(msgT); Sound.stopVoice();
-    freeCanvas(cv); wrap.remove(); onClose && onClose();
+    Sound.music(null); freeCanvas(cv); wrap.remove(); onClose && onClose();
   }
+  const mus = wrap.querySelector('.arc-mus');
+  if (mus) mus.addEventListener('click', () => { Sound.musicOn = !Sound.musicOn; mus.setAttribute('aria-pressed', String(Sound.musicOn)); Sound.fx.tap(); });
   wrap.querySelector('.arc-x').addEventListener('click', () => { Sound.fx.tap(); close(); });
   Sound.say(G.how);
   return close;
@@ -5169,7 +5309,7 @@ function arcRace(a) {
     }
     nightSky = L.moon ? [...Array(40)].map(() => [Math.random() * (W + 80) - 40, Math.random() * HOR * .8, Math.random() * 1.3 + .3]) : [];
     pos = 0; speed = 0; carX = 0; wantX = 0; lane = 1; dragF = null; stars = 0; done = false; doneT = 0; bumpT = 0; slipT = 0; bgX = 0; steer = 0; fx = [];
-    a.score(`⭐ ${stars}`); a.msg(`${L.icon} Level ${level + 1}: ${L.name}`, 2200);
+    a.score(`⭐ ${stars}`); a.msg(`${L.icon} Level ${level + 1}: ${L.name}`, 2200); Sound.music(MUSIC.race[level % MUSIC.race.length]);
   }
   reset();
   const roadAt = w => { const i = Math.max(0, Math.min(seg.length - 2, Math.floor(w / SEG))), f = w / SEG - i; return seg[i].y + (seg[i + 1].y - seg[i].y) * Math.max(0, Math.min(1, f)); };
@@ -5230,7 +5370,7 @@ function arcRace(a) {
         }
       }
       if (done) { doneT += dt; if (doneT > 4.5) { level++; reset(); } }
-      else if (pos >= FIN * SEG) { done = true; doneT = 0; a.fx.win(); a.say('ar_race_win'); a.msg(`🏁 Finish! You got ⭐ ${stars}`, 3200); }
+      else if (pos >= FIN * SEG) { done = true; doneT = 0; a.fx.win(); Sound.jingle(); a.say('ar_race_win'); a.msg(`🏁 Finish! You got ⭐ ${stars}`, 3200); }
     },
     draw() {
       const roll = -steer * .012 + (slipT > 0 ? Math.sin(slipT * 18) * .07 * slipT : 0), sh = bumpT > .5 ? (Math.random() - .5) * 8 * (bumpT - .5) : 0;
@@ -8890,7 +9030,7 @@ function arcUnicorn(a) {
     scen = [];
     for (let i = 2; i < N; i++) for (const s of [-1, 1]) if (Math.random() < .3) scen.push({ w: i * SEG + Math.random() * SEG, x: s * (RHW + 1.6 + Math.random() * 8), k: pick(Lnd.side) });
     objs = []; pos = 0; speed = 0; x = 0; wantX = 0; frozen = 0; gems = 0; hearts = 3; combo = 0; comboT = 0; power = 0; boostT = 0; hurtT = 0; done = false; doneT = 0; bgX = 0; time = 0; shots = []; sparks = []; floats = []; boss = null;
-    gates = level === 'easy' ? 4 : 5; nextGate = 150; nextFoe = 40; a.score(`❄️ ${land + 1}. ${Lnd.name}`); a.msg(`🦄 Level ${land + 1}: ${Lnd.name}`, 2000);
+    gates = level === 'easy' ? 4 : 5; nextGate = 150; nextFoe = 40; a.score(`❄️ ${land + 1}. ${Lnd.name}`); a.msg(`🦄 Level ${land + 1}: ${Lnd.name}`, 2000); Sound.music(MUSIC.uni[land % MUSIC.uni.length]);
   }
   function say(id, force) { const n = performance.now(); if (!force && n - said < 2200) return; said = n; Sound.say(id); }
   function float(t, xx, yy, c = '#fff') { floats.push({ t: 0, s: t, x: xx, y: yy, c }); }
@@ -8921,7 +9061,7 @@ function arcUnicorn(a) {
   // ---- the boss at the end of each ride ----
   function startBoss() {
     const kind = Lnd.boss; boss = { k: 'boss', kind, d: 17, x: 0, ph: 0, ice: 0, need: level === 'easy' ? 16 : Math.min(36, 22 + land * 1.5), shotT: 2.5, frozen: 0, hitT: 0 };
-    say('uni_boss_' + kind, true);
+    say('uni_boss_' + kind, true); Sound.music(MUSIC.boss(land));
   }
   const roadAt = w => { const i = Math.max(0, Math.min(seg.length - 2, Math.floor(w / SEG))), f = w / SEG - i; return seg[i].y + (seg[i + 1].y - seg[i].y) * Math.max(0, Math.min(1, f)); };
   function update(dt) {
@@ -8965,7 +9105,7 @@ function arcUnicorn(a) {
         if (b.ph > 45) b.ice = Math.min(b.need - .01, b.ice + dt * .3);   // a long fight: the cold slowly helps out
         b.x = Math.sin(b.ph * .7) * 2.2; b.shotT -= dt;
         if (b.shotT <= 0) { b.shotT = level === 'easy' ? 2.2 : Math.max(1.1, 1.7 - land * .06); const tl = Math.max(0, Math.min(2, Math.round(x / LANE) + 1)); foe('orb', pos + b.d - 3, laneX(pick([tl, tl, Math.floor(Math.random() * 3)])), { v: 15, h: 1.3, col: { king: '#c9a8ff', bat: '#9a6bff', troll: '#8a8a96', squid: '#3fb0e0', ghost: '#b8c8ff', bee: '#ffd23f', goblin: '#ff7ab8' }[b.kind] || '#ff7a1c' }); }
-      } else { b.frozen += dt; if (b.frozen > 1.6 && !done) { done = true; doneT = 0; objs = []; Sound.fx.win(); burst(W / 2, 140, '#e0f6ff', 40); } }
+      } else { b.frozen += dt; if (b.frozen > 1.6 && !done) { done = true; doneT = 0; objs = []; Sound.fx.win(); Sound.jingle(); burst(W / 2, 140, '#e0f6ff', 40); } }
     }
     if (done) { doneT += dt; if (doneT > 7) { land++; ride(); } }
   }
