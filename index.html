@@ -4963,52 +4963,106 @@ function arcRound(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo
 function arcText(g, t, x, y, size, color = '#fff', align = 'center') { g.font = `800 ${size}px Fredoka, "Baloo 2", system-ui, sans-serif`; g.textAlign = align; g.textBaseline = 'middle'; g.fillStyle = color; g.fillText(t, x, y); }
 function arcEmoji(g, e, x, y, size) { g.font = `${size}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(e, x, y); }
 
-// ---- Moon Landing: hold to fire the engine (the rocket also drifts toward your finger), land slowly on the yellow pad ----
+// ---- Moon Landing: hold to fire the engine (the rocket also drifts toward your finger), land slowly on the yellow pad.
+// Each landing takes you somewhere new: windy Mars, an asteroid field, an icy canyon, a moving pad on an alien world, a space station ----
+const LUNAR_LEVELS = [
+  { name: 'The Moon', icon: '🌙', sky: ['#07081c', '#1d1f4a'], ground: '#9a9aab', crater: '#7d7d90', grav: 30, shape: 'hills' },
+  { name: 'Windy Mars', icon: '🔴', sky: ['#2a0e14', '#7a3524'], ground: '#c4603a', crater: '#9a4428', grav: 32, shape: 'hills', wind: 30 },
+  { name: 'Asteroid Field', icon: '☄️', sky: ['#05060f', '#18142e'], ground: '#8a8296', crater: '#6c6478', grav: 30, shape: 'hills', rocks: 4 },
+  { name: 'Ice Canyon', icon: '🧊', sky: ['#061428', '#1d4a6a'], ground: '#bfe6ff', crater: '#8cc8ea', grav: 31, shape: 'canyon', spikes: true },
+  { name: 'Alien Planet', icon: '👽', sky: ['#12062a', '#3d1a5c'], ground: '#5fbf6a', crater: '#3f9a4a', grav: 30, shape: 'hills', movingPad: true, ufo: true },
+  { name: 'Space Station', icon: '🛰️', sky: ['#03040c', '#121a3a'], ground: '#6a7088', crater: '#4f5570', grav: 32, shape: 'flat', beams: true },
+];
 function arcLunar(a) {
-  const { g, W, H } = a; let level = 0, landed = 0, s, ground, touched = false, rumbleT = 0;
+  const { g, W, H } = a; let level = 0, landed = 0, s, ground, touched = false, rumbleT = 0, L, obs = [], pad, dust = [], introT = 0;
   const sky = [...Array(70)].map(() => [Math.random() * W, Math.random() * H * .75, Math.random() * 1.4 + .4, Math.random() * 6]);
   const hold = new Map();
-  function reset() {
-    const padW = Math.max(64, 118 - level * 9), padX = 70 + Math.random() * (W - 140);
-    ground = []; for (let x = 0; x <= W + 20; x += 20) { let y = H - 46 - Math.sin(x * .028 + level * 1.7) * 14 - Math.cos(x * .071 + level) * 7; if (Math.abs(x - padX) <= padW / 2 + 12) y = H - 46; ground.push([x, y]); }
-    let x0 = 60 + Math.random() * (W - 120); if (Math.abs(x0 - padX) < 60) x0 = (padX + W / 2) % (W - 120) + 60;
-    s = { x: x0, y: 36, vx: 0, vy: 10, flame: 0, padX, padW, over: false, win: false, t: 0 };
+  function reset(fresh) {
+    L = LUNAR_LEVELS[level % LUNAR_LEVELS.length]; const round = Math.floor(level / LUNAR_LEVELS.length);
+    const padW = Math.max(64, 112 - round * 14 + (L.movingPad ? 16 : 0)), base = H - 46;
+    let padX = 80 + Math.random() * (W - 160), padY = base;
+    if (L.shape === 'canyon') { padX = W / 2 + (Math.random() - .5) * 60; padY = H - 30; }   // down at the bottom, between icy cliffs
+    ground = [];
+    for (let x = 0; x <= W + 20; x += 20) {
+      let y = base - Math.sin(x * .028 + level * 1.7) * 14 - Math.cos(x * .071 + level) * 7;
+      if (L.shape === 'flat') y = base + Math.sin(x * .2) * 2;
+      if (L.shape === 'canyon') { const d = Math.abs(x - padX); y = d < 70 ? H - 30 : Math.max(150, H - 30 - (d - 70) * 2.2); }
+      if (!L.movingPad && Math.abs(x - padX) <= padW / 2 + 12) y = padY;
+      ground.push([x, y]);
+    }
+    pad = { x: padX, y: padY, w: padW, vx: 0, float: false };
+    if (L.movingPad) pad = { x: W / 2, y: H - 104, w: padW, vx: 26 + round * 8, float: true };   // a platform that glides back and forth
+    let x0 = 60 + Math.random() * (W - 120); if (Math.abs(x0 - pad.x) < 70) x0 = (pad.x + W / 2) % (W - 120) + 60;
+    if (L.shape === 'canyon') x0 = pad.x + (Math.random() < .5 ? -1 : 1) * 150;
+    s = { x: Math.max(30, Math.min(W - 30, x0)), y: 36, vx: 0, vy: 10, flame: 0, over: false, win: false, t: 0, why: '' };
+    obs = [];
+    if (L.rocks) for (let i = 0; i < L.rocks + round; i++) obs.push({ k: 'rock', x: Math.random() * W, y: 110 + i * 46 % 150 + Math.random() * 20, r: 13 + Math.random() * 8, vx: (Math.random() < .5 ? -1 : 1) * (22 + Math.random() * 20 + round * 6), rot: Math.random() * 6 });
+    if (L.spikes) for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const x = pad.x + sx * (86 + i * 34); obs.push({ k: 'spike', x, y: groundAtX(x) - 10, r: 9 }); }
+    if (L.ufo) obs.push({ k: 'ufo', x: W / 2, y: 150, r: 18, ph: Math.random() * 6 });
+    if (L.beams) { const gap = 92 - round * 8, gx = pad.x + (Math.random() - .5) * 80; obs.push({ k: 'beam', x: 0, y: 150, w: Math.max(20, gx - gap / 2), h: 14 }, { k: 'beam', x: gx + gap / 2, y: 150, w: W - (gx + gap / 2), h: 14 }); }
+    if (fresh) { introT = 2.2; a.msg(`${L.icon} Level ${level + 1}: ${L.name}`, 2000); }
   }
-  reset(); a.score(`🌙 ${landed}`);
-  const groundAt = x => { const i = Math.max(0, Math.min(ground.length - 2, Math.floor(x / 20))); const [x0, y0] = ground[i], [x1, y1] = ground[i + 1]; return y0 + (y1 - y0) * ((x - x0) / (x1 - x0)); };
+  function groundAtX(x) { const i = Math.max(0, Math.min(ground.length - 2, Math.floor(x / 20))); const [x0, y0] = ground[i], [x1, y1] = ground[i + 1]; return y0 + (y1 - y0) * ((x - x0) / (x1 - x0)); }
+  reset(true); a.score(`🌙 ${landed}`);
   const SAFE = 58;   // landing slower than this is soft
+  function crash(why) { s.over = true; s.win = false; s.t = 0; s.why = why; a.fx.pop(); a.fx.rumble(.6);
+    if (why === 'bonk') { a.say('ar_bump'); a.msg('Bonk! Steer around it! ☄️'); } else { a.say(why === 'fast' ? 'ar_crash' : 'ar_offpad'); a.msg(why === 'fast' ? 'Too fast! 💥' : 'Land on the yellow pad!'); } }
+  function land() { const soft = s.vy < SAFE; if (!soft) return crash('fast'); s.over = true; s.win = true; s.t = 0; landed++; level++; a.score(`🌙 ${landed}`); a.fx.win(); a.say('ar_land'); a.msg('Perfect landing! 🎉'); }
   return {
-    peek: () => ({ ...s, landed }),
+    setLevel: n => { level = n; reset(true); },   // for testing
+    peek: () => ({ ...s, landed, level, name: L.name, padVX: pad.vx, padX: pad.x, padY: pad.y, padW: pad.w, obs: obs.map(o => ({ ...o })) }),
     down(x, y, id) { hold.set(id, [x, y]); touched = true; }, move(x, y, id) { if (hold.has(id)) hold.set(id, [x, y]); }, up(x, y, id) { hold.delete(id); },
     update(dt) {
-      for (const st of sky) st[3] += dt;
-      if (s.over) { s.t += dt; if (s.t > 2.4) reset(); return; }
-      const h = [...hold.values()][0];
-      s.vy += (30 + Math.min(level, 6) * 2.5) * dt;
+      for (const st of sky) st[3] += dt; introT -= dt;
+      for (const o of obs) { if (o.k === 'rock') { o.x += o.vx * dt; o.rot += dt * o.vx / 30; if (o.x < -30) o.x = W + 30; if (o.x > W + 30) o.x = -30; } if (o.k === 'ufo') { o.ph += dt; o.x = W / 2 + Math.sin(o.ph * .5) * (W / 2 - 60); o.y = 130 + Math.sin(o.ph * 1.1) * 20; } }
+      if (pad.float) { pad.x += pad.vx * dt; if (pad.x > W - pad.w / 2 - 10) { pad.x = W - pad.w / 2 - 10; pad.vx = -Math.abs(pad.vx); } if (pad.x < pad.w / 2 + 10) { pad.x = pad.w / 2 + 10; pad.vx = Math.abs(pad.vx); } }
+      if (L.wind) for (const d of dust) { d[0] += (L.wind * Math.sin(performance.now() / 1400) * 3 + 20) * dt; if (d[0] > W) d[0] -= W; if (d[0] < 0) d[0] += W; }
+      if (L.wind && dust.length < 40) dust.push([Math.random() * W, Math.random() * H, Math.random() * 1.5 + .5]);
+      if (s.over) { s.t += dt; if (s.on) s.x += pad.vx * dt * (pad.float ? 1 : 0); if (s.t > 2.4) reset(s.win); return; }
+      const h = [...hold.values()][0], round = Math.floor(level / LUNAR_LEVELS.length);
+      s.vy += (L.grav + Math.min(round, 3) * 3) * dt;
+      if (L.wind) s.vx += L.wind * Math.sin(performance.now() / 1400) * dt;   // gusts push you sideways
       if (h) {
-        s.vy -= 78 * dt; s.vx += Math.max(-70, Math.min(70, (h[0] - s.x) * 1.4)) * dt; s.flame = Math.min(1, s.flame + dt * 6);
+        s.vy -= 78 * dt; s.vx += Math.max(-80, Math.min(80, (h[0] - s.x) * 2)) * dt; s.flame = Math.min(1, s.flame + dt * 6);
         rumbleT -= dt; if (rumbleT <= 0) { rumbleT = .32; a.fx.rumble(.08); }
       } else s.flame = Math.max(0, s.flame - dt * 6);
       s.vx *= 1 - .7 * dt; s.vy = Math.max(-90, Math.min(170, s.vy));
-      s.x = Math.max(16, Math.min(W - 16, s.x + s.vx * dt)); s.y = Math.max(14, s.y + s.vy * dt);
-      const gy = groundAt(s.x);
-      if (s.y + 20 >= gy) {
-        s.y = gy - 20; s.over = true; s.t = 0;
-        const onPad = Math.abs(s.x - s.padX) < s.padW / 2 - 4, soft = s.vy < SAFE;
-        if (onPad && soft) { s.win = true; landed++; level++; a.score(`🌙 ${landed}`); a.fx.win(); a.say('ar_land'); a.msg('Perfect landing! 🎉'); }
-        else { a.fx.pop(); a.fx.rumble(.6); a.say(onPad ? 'ar_crash' : 'ar_offpad'); a.msg(onPad ? 'Too fast! 💥' : 'Land on the yellow pad!'); }
+      const py0 = s.y; s.x = Math.max(16, Math.min(W - 16, s.x + s.vx * dt)); s.y = Math.max(14, s.y + s.vy * dt);
+      // bumping into things
+      for (const o of obs) {
+        if (o.k === 'beam') { if (s.x + 9 > o.x && s.x - 9 < o.x + o.w && s.y + 18 > o.y && s.y - 20 < o.y + o.h) return crash('bonk'); }
+        else if (Math.hypot(s.x - o.x, s.y - o.y) < o.r + 11) return crash('bonk');
       }
+      // a floating pad: land on its top
+      if (pad.float && s.vy > 0 && py0 + 20 <= pad.y + 2 && s.y + 20 >= pad.y && Math.abs(s.x - pad.x) < pad.w / 2 + 6) {
+        s.y = pad.y - 20; if (Math.abs(s.x - pad.x) < pad.w / 2 - 4) { s.on = true; return land(); } return crash('off');
+      }
+      const gy = groundAtX(s.x);
+      if (s.y + 20 >= gy) { s.y = gy - 20; if (!pad.float && Math.abs(s.x - pad.x) < pad.w / 2 - 4) return land(); return crash(pad.float ? 'off' : 'off'); }
     },
     draw() {
-      const sk = g.createLinearGradient(0, 0, 0, H); sk.addColorStop(0, '#07081c'); sk.addColorStop(1, '#1d1f4a'); g.fillStyle = sk; g.fillRect(0, 0, W, H);
+      const sk = g.createLinearGradient(0, 0, 0, H); sk.addColorStop(0, L.sky[0]); sk.addColorStop(1, L.sky[1]); g.fillStyle = sk; g.fillRect(0, 0, W, H);
       for (const [x, y, r, t] of sky) { g.globalAlpha = .55 + .45 * Math.sin(t * 2 + x); g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); } g.globalAlpha = 1;
-      // the Earth, far away
-      g.fillStyle = '#3f8cff'; g.beginPath(); g.arc(W - 62, 58, 26, 0, 7); g.fill(); g.fillStyle = '#5cc46a'; g.beginPath(); g.ellipse(W - 70, 52, 10, 7, .5, 0, 7); g.ellipse(W - 52, 66, 8, 5, -.4, 0, 7); g.fill();
-      // the ground, with craters and the landing pad
-      g.fillStyle = '#9a9aab'; g.beginPath(); g.moveTo(0, H); ground.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(W, H); g.closePath(); g.fill();
-      g.fillStyle = '#7d7d90'; [[60, 22, 12], [190, 26, 9], [330, 20, 14], [430, 28, 8]].forEach(([x, dy, r]) => { g.beginPath(); g.ellipse(x, H - dy, r, r * .4, 0, 0, 7); g.fill(); });
-      const py = H - 46; g.fillStyle = '#ffd23f'; arcRound(g, s.padX - s.padW / 2, py - 3, s.padW, 8, 3); g.fill();
-      g.fillStyle = '#3a3340'; for (let i = 0; i < 4; i++) g.fillRect(s.padX - s.padW / 2 + 6 + i * (s.padW - 18) / 3, py + 5, 6, 8);
+      // something in the sky for each place
+      if (L.name === 'The Moon') { g.fillStyle = '#3f8cff'; g.beginPath(); g.arc(W - 62, 58, 26, 0, 7); g.fill(); g.fillStyle = '#5cc46a'; g.beginPath(); g.ellipse(W - 70, 52, 10, 7, .5, 0, 7); g.ellipse(W - 52, 66, 8, 5, -.4, 0, 7); g.fill(); }
+      else if (L.wind) { g.fillStyle = '#ffd9a0'; g.beginPath(); g.arc(W - 60, 52, 12, 0, 7); g.fill(); }
+      else if (L.ufo) { g.fillStyle = '#ff9fd6'; g.beginPath(); g.arc(W - 70, 60, 22, 0, 7); g.fill(); g.strokeStyle = '#ffd6f0'; g.lineWidth = 3; g.beginPath(); g.ellipse(W - 70, 60, 36, 8, -.3, 0, 7); g.stroke(); }
+      else if (L.shape === 'canyon') { g.fillStyle = '#e6f6ff'; g.beginPath(); g.arc(70, 54, 18, 0, 7); g.fill(); }
+      // the wind, shown as blowing dust and an arrow
+      if (L.wind) { const w = Math.sin(performance.now() / 1400); g.fillStyle = 'rgba(255,200,150,.5)'; for (const [x, y, r] of dust) g.fillRect(x, y, r * 4, r); arcText(g, w > 0 ? '💨 →' : '← 💨', W / 2, 24, 18, '#ffd9a0'); }
+      // the ground and the pad
+      g.fillStyle = L.ground; g.beginPath(); g.moveTo(0, H); ground.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(W, H); g.closePath(); g.fill();
+      g.fillStyle = L.crater; [[60, 22, 12], [190, 26, 9], [330, 20, 14], [430, 28, 8]].forEach(([x, dy, r]) => { if (L.shape === 'canyon') return; g.beginPath(); g.ellipse(x, H - dy, r, r * .4, 0, 0, 7); g.fill(); });
+      if (pad.float) { g.strokeStyle = 'rgba(160,255,200,.5)'; g.lineWidth = 3; g.setLineDash([4, 5]); g.beginPath(); g.moveTo(pad.x, pad.y + 8); g.lineTo(pad.x, groundAtX(pad.x)); g.stroke(); g.setLineDash([]); g.fillStyle = '#5a5f78'; arcRound(g, pad.x - pad.w / 2 - 4, pad.y + 3, pad.w + 8, 8, 4); g.fill(); }
+      g.fillStyle = '#ffd23f'; arcRound(g, pad.x - pad.w / 2, pad.y - 3, pad.w, 8, 3); g.fill();
+      if (!pad.float) { g.fillStyle = '#3a3340'; for (let i = 0; i < 4; i++) g.fillRect(pad.x - pad.w / 2 + 6 + i * (pad.w - 18) / 3, pad.y + 5, 6, 8); }
+      // the obstacles
+      for (const o of obs) {
+        if (o.k === 'rock') { g.save(); g.translate(o.x, o.y); g.rotate(o.rot); g.fillStyle = '#8a7a6a'; g.strokeStyle = '#3a3340'; g.lineWidth = 2; g.beginPath(); for (let i = 0; i < 8; i++) { const t = i / 8 * Math.PI * 2, rr = o.r * (.8 + .2 * Math.sin(i * 2.3)); g.lineTo(Math.cos(t) * rr, Math.sin(t) * rr); } g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#6c5e50'; g.beginPath(); g.arc(-o.r * .3, -o.r * .2, o.r * .25, 0, 7); g.arc(o.r * .3, o.r * .3, o.r * .18, 0, 7); g.fill(); g.restore(); }
+        else if (o.k === 'spike') { g.fillStyle = '#7fd8ff'; g.strokeStyle = '#2a6a9a'; g.lineWidth = 2; g.beginPath(); g.moveTo(o.x - 9, o.y + 10); g.lineTo(o.x - 3, o.y - 14); g.lineTo(o.x + 2, o.y + 2); g.lineTo(o.x + 6, o.y - 10); g.lineTo(o.x + 10, o.y + 10); g.closePath(); g.fill(); g.stroke(); }
+        else if (o.k === 'ufo') { g.fillStyle = '#b8f5c8'; g.beginPath(); g.ellipse(o.x, o.y - 6, 10, 9, 0, Math.PI, 0); g.fill(); g.fillStyle = '#9a9ab8'; g.strokeStyle = '#3a3340'; g.lineWidth = 2; g.beginPath(); g.ellipse(o.x, o.y, 22, 7, 0, 0, 7); g.fill(); g.stroke(); for (let i = -1; i <= 1; i++) { g.fillStyle = (Math.floor(performance.now() / 200) + i) % 2 ? '#ffd23f' : '#ff5ab0'; g.beginPath(); g.arc(o.x + i * 11, o.y + 1, 2.4, 0, 7); g.fill(); } }
+        else if (o.k === 'beam') { g.fillStyle = '#8a93a8'; g.strokeStyle = '#3a3340'; g.lineWidth = 2; g.fillRect(o.x, o.y, o.w, o.h); g.strokeRect(o.x, o.y, o.w, o.h); g.strokeStyle = '#ffd23f'; g.lineWidth = 3; g.setLineDash([8, 8]); g.beginPath(); g.moveTo(o.x, o.y + o.h / 2); g.lineTo(o.x + o.w, o.y + o.h / 2); g.stroke(); g.setLineDash([]); }
+      }
       // the rocket
       g.save(); g.translate(s.x, s.y);
       if (s.over && !s.win) g.rotate(.7);
@@ -5027,62 +5081,84 @@ function arcLunar(a) {
       const v = Math.max(0, Math.min(1, s.vy / 140)), ok = s.vy < SAFE;
       g.fillStyle = ok ? '#45c46a' : '#ff5a4e'; g.beginPath(); g.arc(mx + 8, my + mh - v * mh, 10, 0, 7); g.fill(); arcText(g, ok ? '🙂' : '😮', mx + 8, my + mh - v * mh + 1, 12);
       arcText(g, 'speed', mx + 8, my + mh + 16, 12, '#c9c9e6');
+      arcText(g, `Level ${level + 1} · ${L.name}`, W - 12, H - 14, 13, 'rgba(255,255,255,.75)', 'right');
       if (!touched) arcText(g, '👆 Hold down to fire the engine', W / 2, H / 2 - 30, 20, '#ffe27a');
     },
   };
 }
 
 // ---- Turbo Race: you're in the driver's seat, looking down a winding, hilly road. Drag left and right to steer;
-// grab the stars, miss the cones, oil and slow cars, and reach the finish ----
+// grab the stars, miss the cones, oil and slow cars, and reach the finish. Each finish takes you to a new place, a bit faster and busier ----
+const RACE_LEVELS = [
+  { name: 'Sunny Meadow', icon: '🌼', sky: ['#4fa9ff', '#cdeaff'], far: '#9fb7d8', near: '#6fbf6a', grass: ['#62b85e', '#5aaf57'], road: '#676b79', rumble: ['#ff5a4e', '#fff'], side: ['tree', 'tree', 'pine', 'bush'], bad: ['cone', 'cone', 'car', 'oil'], sun: '#fff3b0', curve: 1, hill: 1, busy: 1 },
+  { name: 'Desert Canyon', icon: '🌵', sky: ['#ff9f5a', '#ffe2b0'], far: '#c97a4a', near: '#e0a060', grass: ['#e8c48a', '#e0b97c'], road: '#7a6a62', rumble: ['#ff5a4e', '#fff'], side: ['cactus', 'cactus', 'boulder', 'tumble'], bad: ['cone', 'rock', 'car', 'oil'], sun: '#fff6d0', curve: 1.2, hill: .7, busy: 1.15 },
+  { name: 'Snowy Mountain', icon: '❄️', sky: ['#7fa8e0', '#e8f2ff'], far: '#c8d8f0', near: '#f4f8fd', grass: ['#f4f8fc', '#e4ecf7'], road: '#5f6676', rumble: ['#4a8bff', '#fff'], side: ['snowpine', 'snowpine', 'snowman', 'snowpine'], bad: ['cone', 'ice', 'car', 'ice'], sun: '#ffffff', curve: 1.1, hill: 1.6, busy: 1.25 },
+  { name: 'Beach Road', icon: '🏖️', sky: ['#4ec4ff', '#d6f5ff'], sea: '#3fb0e0', near: '#f2d8a0', grass: ['#f2d8a0', '#ead09a'], road: '#6a6e7c', rumble: ['#ffd23f', '#fff'], side: ['palm', 'palm', 'umbrella', 'palm'], bad: ['cone', 'car', 'puddle', 'crab'], sun: '#fff3b0', curve: 1, hill: .6, busy: 1.35 },
+  { name: 'Night City', icon: '🌃', sky: ['#0b0b2a', '#3a2a6a'], far: '#2a2350', near: '#1d1838', grass: ['#2b2b3c', '#25253a'], road: '#3c3c4c', rumble: ['#ff5ab0', '#fff'], side: ['building', 'building', 'lamp', 'building'], bad: ['cone', 'car', 'car', 'oil'], moon: true, curve: 1.3, hill: 1, busy: 1.5 },
+];
 function arcRace(a) {
   const { g, W, H } = a, SEG = 4, DRAW = 90, F = 290, HOR = 128, CAMH = 1.25, LANE = 2.3, RHW = 3.9, CURVE = .05, FIN = 240;
-  const laneX = l => (l - 1) * LANE;
-  let seg, scen, objs, pos, speed, carX, wantX, lane, stars, done, doneT, bumpT, slipT, bgX, steer, touched = false, sayT = 0, fx = [], dragF = null;
+  const laneX = l => (l - 1) * LANE, BUMP = { cone: 1, car: 1, rock: 1, crab: 1 };
+  let seg, scen, objs, pos, speed, carX, wantX, lane, stars, done, doneT, bumpT, slipT, bgX, steer, touched = false, sayT = 0, fx = [], dragF = null, level = 0, L, nightSky = [];
   const MAXX = LANE + .35, PER = .024;   // how far the car can go each way; meters of steering per screen unit of drag
   function reset() {
-    // the track: straights and gentle bends (each bend eases in and out), over rolling hills
+    L = RACE_LEVELS[level % RACE_LEVELS.length]; const round = Math.floor(level / RACE_LEVELS.length), busy = L.busy + round * .25;
+    // the track: straights and bends (each bend eases in and out), over hills
     seg = []; const N = FIN + DRAW + 20;
     const add = (n, c) => { for (let k = 0; k < n && seg.length < N; k++) seg.push({ c: c * Math.sin(Math.PI * k / n) }); };
-    add(24, 0); while (seg.length < N) add(22 + Math.floor(Math.random() * 26), pick([-2.4, -1.4, 0, 1.4, 2.4]));
-    const ph = Math.random() * 6; seg.forEach((s, i) => { s.y = Math.min(1, i / 40) * (5 * Math.sin(i * Math.PI * 2 / 120 + ph) + 2 * Math.sin(i * Math.PI * 2 / 47)); });
-    // trees, bushes and bend signs along the side
+    add(24, 0); while (seg.length < N) add(22 + Math.floor(Math.random() * 26), pick([-2.4, -1.4, 0, 1.4, 2.4]) * L.curve);
+    const ph = Math.random() * 6; seg.forEach((s, i) => { s.y = L.hill * Math.min(1, i / 40) * (5 * Math.sin(i * Math.PI * 2 / 120 + ph) + 2 * Math.sin(i * Math.PI * 2 / 47)); });
+    // things along the side, and signs before bends
     scen = [];
     for (let i = 2; i < N; i++) {
-      for (const s of [-1, 1]) if (Math.random() < .3) scen.push({ w: i * SEG + Math.random() * SEG, x: s * (RHW + 2 + Math.random() * 9), k: Math.random() < .6 ? 'tree' : Math.random() < .5 ? 'pine' : 'bush' });
+      for (const s of [-1, 1]) if (Math.random() < (L.side[0] === 'building' ? .5 : .3)) scen.push({ w: i * SEG + Math.random() * SEG, x: s * (RHW + (L.side[0] === 'building' ? 4 : 2) + Math.random() * 9), k: pick(L.side) });
       if (i % 30 === 8 && Math.abs(seg[Math.min(N - 1, i + 6)].c) > .5) { const s = Math.sign(seg[i + 6].c); scen.push({ w: i * SEG, x: -s * (RHW + 1.4), k: 'sign', dir: s }); }
     }
     // stars and things to steer around: never all three lanes at once
     objs = [];
-    for (let i = 30; i < FIN - 10; i += 8 + Math.floor(Math.random() * 6)) {
-      const lanes = [0, 1, 2].sort(() => Math.random() - .5), n = Math.random() < .3 ? 2 : 1;
-      for (let k = 0; k < n; k++) objs.push({ w: i * SEG + 2, lane: lanes[k], type: Math.random() < .42 ? 'star' : pick(['cone', 'cone', 'car', 'oil']), c: pick(['#4a8bff', '#45c46a', '#9a6bff', '#ffd23f']), hit: false, fly: 0 });
+    for (let i = 30; i < FIN - 10; i += Math.max(5, Math.round((8 + Math.random() * 6) / busy))) {
+      const lanes = [0, 1, 2].sort(() => Math.random() - .5), n = Math.random() < Math.min(.55, .3 * busy) ? 2 : 1;
+      for (let k = 0; k < n; k++) objs.push({ w: i * SEG + 2, lane: lanes[k], type: Math.random() < .42 ? 'star' : pick(L.bad), c: pick(['#4a8bff', '#45c46a', '#9a6bff', '#ffd23f', '#ff9f1c']), hit: false, fly: 0 });
     }
+    nightSky = L.moon ? [...Array(40)].map(() => [Math.random() * (W + 80) - 40, Math.random() * HOR * .8, Math.random() * 1.3 + .3]) : [];
     pos = 0; speed = 0; carX = 0; wantX = 0; lane = 1; dragF = null; stars = 0; done = false; doneT = 0; bumpT = 0; slipT = 0; bgX = 0; steer = 0; fx = [];
-    a.score(`⭐ ${stars}`);
+    a.score(`⭐ ${stars}`); a.msg(`${L.icon} Level ${level + 1}: ${L.name}`, 2200);
   }
   reset();
   const roadAt = w => { const i = Math.max(0, Math.min(seg.length - 2, Math.floor(w / SEG))), f = w / SEG - i; return seg[i].y + (seg[i + 1].y - seg[i].y) * Math.max(0, Math.min(1, f)); };
   // little roadside and road things, drawn standing at (x, y) with s pixels per meter
   function sprite(o, x, y, s) {
-    if (o.k === 'tree') { g.fillStyle = '#7a4f2a'; g.fillRect(x - .25 * s, y - 1.8 * s, .5 * s, 1.8 * s); g.fillStyle = '#3f9a4a'; g.beginPath(); g.arc(x, y - 2.8 * s, 1.5 * s, 0, 7); g.fill(); g.fillStyle = '#56b862'; g.beginPath(); g.arc(x - .4 * s, y - 3.2 * s, .9 * s, 0, 7); g.fill(); }
-    else if (o.k === 'pine') { g.fillStyle = '#6b4424'; g.fillRect(x - .2 * s, y - 1 * s, .4 * s, 1 * s); g.fillStyle = '#2f7d45'; for (let k = 0; k < 3; k++) { g.beginPath(); g.moveTo(x, y - (5 - k * 1.2) * s); g.lineTo(x + (1.1 + k * .35) * s, y - (1.6 + (2 - k) * 1.1) * s + 1.2 * s); g.lineTo(x - (1.1 + k * .35) * s, y - (1.6 + (2 - k) * 1.1) * s + 1.2 * s); g.fill(); } }
-    else if (o.k === 'bush') { g.fillStyle = '#4aa956'; g.beginPath(); g.arc(x - .5 * s, y - .5 * s, .6 * s, 0, 7); g.arc(x + .4 * s, y - .55 * s, .7 * s, 0, 7); g.fill(); }
-    else if (o.k === 'sign') { g.fillStyle = '#8a8a96'; g.fillRect(x - .08 * s, y - 2 * s, .16 * s, 2 * s); g.fillStyle = '#ffd23f'; g.fillRect(x - .9 * s, y - 2.6 * s, 1.8 * s, 1 * s); g.strokeStyle = '#26222c'; g.lineWidth = Math.max(1, .14 * s); g.beginPath(); for (const k of [-.35, .25]) { g.moveTo(x + (k - .2 * o.dir) * s, y - 2.45 * s); g.lineTo(x + (k + .2 * o.dir) * s, y - 2.1 * s); g.lineTo(x + (k - .2 * o.dir) * s, y - 1.75 * s); } g.stroke(); }
-    else if (o.type === 'star') { const sp = Math.cos(performance.now() / 160 + o.w), r = .6 * s; g.save(); g.translate(x, y - 1.1 * s - Math.sin(performance.now() / 200 + o.w) * .15 * s); g.scale(Math.max(.15, Math.abs(sp)), 1); g.shadowColor = '#fff3a0'; g.shadowBlur = 12; arcStar(g, 0, 0, r, '#ffd23f'); g.shadowBlur = 0; arcStar(g, 0, 0, r * .55, '#fff3a0'); g.restore(); }
-    else if (o.type === 'cone') { const fy = o.fly; g.save(); g.translate(x + fy * 3 * s * (o.lane - 1 || 1), y - fy * 4 * s); g.rotate(fy * 4); g.fillStyle = '#ff7a1c'; g.beginPath(); g.moveTo(0, -.8 * s); g.lineTo(.32 * s, 0); g.lineTo(-.32 * s, 0); g.fill(); g.fillStyle = '#fff'; g.fillRect(-.2 * s, -.45 * s, .4 * s, .14 * s); g.fillStyle = '#e8650f'; g.fillRect(-.42 * s, -.06 * s, .84 * s, .12 * s); g.restore(); }
-    else if (o.type === 'oil') { g.fillStyle = '#23202b'; g.beginPath(); g.ellipse(x, y - .05 * s, .9 * s, .22 * s, 0, 0, 7); g.fill(); g.fillStyle = 'rgba(160,140,255,.4)'; g.beginPath(); g.ellipse(x - .3 * s, y - .1 * s, .3 * s, .07 * s, 0, 0, 7); g.fill(); }
-    else if (o.type === 'car') {
+    const k = o.k || o.type, now = performance.now();
+    if (k === 'tree') { g.fillStyle = '#7a4f2a'; g.fillRect(x - .25 * s, y - 1.8 * s, .5 * s, 1.8 * s); g.fillStyle = '#3f9a4a'; g.beginPath(); g.arc(x, y - 2.8 * s, 1.5 * s, 0, 7); g.fill(); g.fillStyle = '#56b862'; g.beginPath(); g.arc(x - .4 * s, y - 3.2 * s, .9 * s, 0, 7); g.fill(); }
+    else if (k === 'pine' || k === 'snowpine') { g.fillStyle = '#6b4424'; g.fillRect(x - .2 * s, y - 1 * s, .4 * s, 1 * s); for (let i = 0; i < 3; i++) { g.fillStyle = '#2f7d45'; g.beginPath(); g.moveTo(x, y - (5 - i * 1.2) * s); g.lineTo(x + (1.1 + i * .35) * s, y - (1.6 + (2 - i) * 1.1) * s + 1.2 * s); g.lineTo(x - (1.1 + i * .35) * s, y - (1.6 + (2 - i) * 1.1) * s + 1.2 * s); g.fill(); if (k === 'snowpine') { g.fillStyle = '#fff'; g.beginPath(); g.moveTo(x, y - (5 - i * 1.2) * s); g.lineTo(x + .5 * s, y - (4.2 - i * 1.2) * s); g.lineTo(x - .5 * s, y - (4.2 - i * 1.2) * s); g.fill(); } } }
+    else if (k === 'bush') { g.fillStyle = '#4aa956'; g.beginPath(); g.arc(x - .5 * s, y - .5 * s, .6 * s, 0, 7); g.arc(x + .4 * s, y - .55 * s, .7 * s, 0, 7); g.fill(); }
+    else if (k === 'cactus') { g.fillStyle = '#3f9a4a'; arcRound(g, x - .3 * s, y - 3 * s, .6 * s, 3 * s, .3 * s); g.fill(); arcRound(g, x - 1 * s, y - 2.2 * s, .45 * s, 1.2 * s, .22 * s); g.fill(); arcRound(g, x + .55 * s, y - 2.6 * s, .45 * s, 1.3 * s, .22 * s); g.fill(); g.fillRect(x - .8 * s, y - 1.4 * s, .6 * s, .35 * s); g.fillRect(x + .2 * s, y - 1.7 * s, .6 * s, .35 * s); }
+    else if (k === 'boulder') { g.fillStyle = '#b5683e'; g.beginPath(); g.ellipse(x, y - .9 * s, 1.6 * s, 1 * s, 0, Math.PI, 0); g.fill(); g.fillStyle = '#c98050'; g.beginPath(); g.ellipse(x - .4 * s, y - 1.2 * s, .6 * s, .35 * s, 0, 0, 7); g.fill(); }
+    else if (k === 'tumble') { g.strokeStyle = '#a8804a'; g.lineWidth = Math.max(1, .1 * s); const r = .5 * s, cy = y - r - Math.abs(Math.sin(now / 200 + o.w)) * .4 * s; for (let i = 0; i < 4; i++) { g.beginPath(); g.ellipse(x, cy, r, r * .7, i * .8 + now / 300, 0, 7); g.stroke(); } }
+    else if (k === 'snowman') { g.fillStyle = '#fff'; g.strokeStyle = '#9ab0cc'; g.lineWidth = 1; for (const [dy, r] of [[.7, .7], [1.8, .5], [2.6, .35]]) { g.beginPath(); g.arc(x, y - dy * s, r * s, 0, 7); g.fill(); g.stroke(); } g.fillStyle = '#ff7a1c'; g.beginPath(); g.moveTo(x, y - 2.6 * s); g.lineTo(x + .4 * s, y - 2.55 * s); g.lineTo(x, y - 2.5 * s); g.fill(); }
+    else if (k === 'palm') { g.strokeStyle = '#9a6a3a'; g.lineWidth = Math.max(1, .3 * s); g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + .6 * s, y - 2 * s, x + .3 * s, y - 4 * s); g.stroke(); g.fillStyle = '#3fae5a'; for (let i = 0; i < 5; i++) { const t = -2.6 + i * .55; g.beginPath(); g.ellipse(x + .3 * s + Math.cos(t) * 1 * s, y - 4 * s + Math.sin(t) * .5 * s + .4 * s, 1.1 * s, .3 * s, t, 0, 7); g.fill(); } }
+    else if (k === 'umbrella') { g.fillStyle = '#fff'; g.fillRect(x - .05 * s, y - 2 * s, .1 * s, 2 * s); g.fillStyle = '#ff5a4e'; g.beginPath(); g.moveTo(x - 1.2 * s, y - 1.9 * s); g.quadraticCurveTo(x, y - 3 * s, x + 1.2 * s, y - 1.9 * s); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.moveTo(x - .4 * s, y - 2.2 * s); g.quadraticCurveTo(x, y - 2.95 * s, x + .4 * s, y - 2.2 * s); g.fill(); }
+    else if (k === 'building') { const hgt = (6 + (o.w * 7 % 9)) * s, wd = 3.4 * s; g.fillStyle = ['#3a3366', '#2e2a55', '#4a3a70'][Math.floor(o.w) % 3]; g.fillRect(x - wd / 2, y - hgt, wd, hgt); g.fillStyle = '#ffe27a'; if (s > 2) for (let r = 0; r < hgt / s - 1; r += 1.2) for (let c = 0; c < 3; c++) if ((Math.floor(o.w) + r * 3 + c) % 3) g.fillRect(x - wd / 2 + (.5 + c * 1) * s, y - hgt + (.6 + r) * s, .5 * s, .55 * s); }
+    else if (k === 'lamp') { g.fillStyle = '#8a8aa0'; g.fillRect(x - .08 * s, y - 4 * s, .16 * s, 4 * s); g.fillRect(x - .08 * s, y - 4 * s, (o.x > 0 ? -1 : 1) * 1 * s, .14 * s); const lx = x + (o.x > 0 ? -1 : 1) * 1 * s; g.fillStyle = 'rgba(255,230,140,.25)'; g.beginPath(); g.moveTo(lx, y - 3.9 * s); g.lineTo(lx - 1.5 * s, y); g.lineTo(lx + 1.5 * s, y); g.fill(); g.fillStyle = '#fff3a0'; g.beginPath(); g.arc(lx, y - 3.85 * s, .2 * s, 0, 7); g.fill(); }
+    else if (k === 'sign') { g.fillStyle = '#8a8a96'; g.fillRect(x - .08 * s, y - 2 * s, .16 * s, 2 * s); g.fillStyle = '#ffd23f'; g.fillRect(x - .9 * s, y - 2.6 * s, 1.8 * s, 1 * s); g.strokeStyle = '#26222c'; g.lineWidth = Math.max(1, .14 * s); g.beginPath(); for (const kk of [-.35, .25]) { g.moveTo(x + (kk - .2 * o.dir) * s, y - 2.45 * s); g.lineTo(x + (kk + .2 * o.dir) * s, y - 2.1 * s); g.lineTo(x + (kk - .2 * o.dir) * s, y - 1.75 * s); } g.stroke(); }
+    else if (k === 'star') { const sp = Math.cos(now / 160 + o.w), r = .6 * s; g.save(); g.translate(x, y - 1.1 * s - Math.sin(now / 200 + o.w) * .15 * s); g.scale(Math.max(.15, Math.abs(sp)), 1); g.shadowColor = '#fff3a0'; g.shadowBlur = 12; arcStar(g, 0, 0, r, '#ffd23f'); g.shadowBlur = 0; arcStar(g, 0, 0, r * .55, '#fff3a0'); g.restore(); }
+    else if (k === 'cone') { const fy = o.fly; g.save(); g.translate(x + fy * 3 * s * (o.lane - 1 || 1), y - fy * 4 * s); g.rotate(fy * 4); g.fillStyle = '#ff7a1c'; g.beginPath(); g.moveTo(0, -.8 * s); g.lineTo(.32 * s, 0); g.lineTo(-.32 * s, 0); g.fill(); g.fillStyle = '#fff'; g.fillRect(-.2 * s, -.45 * s, .4 * s, .14 * s); g.fillStyle = '#e8650f'; g.fillRect(-.42 * s, -.06 * s, .84 * s, .12 * s); g.restore(); }
+    else if (k === 'rock') { g.fillStyle = '#9a6a4a'; g.strokeStyle = '#5a3a2a'; g.lineWidth = Math.max(1, .06 * s); g.beginPath(); g.moveTo(x - .7 * s, y); g.lineTo(x - .5 * s, y - .6 * s); g.lineTo(x, y - .8 * s); g.lineTo(x + .6 * s, y - .5 * s); g.lineTo(x + .75 * s, y); g.closePath(); g.fill(); g.stroke(); }
+    else if (k === 'crab') { const sc = Math.sin(now / 150 + o.w) * .15 * s; g.fillStyle = '#ff4a3e'; g.beginPath(); g.ellipse(x + sc, y - .35 * s, .55 * s, .32 * s, 0, 0, 7); g.fill(); g.beginPath(); g.arc(x + sc - .7 * s, y - .6 * s, .2 * s, 0, 7); g.arc(x + sc + .7 * s, y - .6 * s, .2 * s, 0, 7); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(x + sc - .18 * s, y - .65 * s, .1 * s, 0, 7); g.arc(x + sc + .18 * s, y - .65 * s, .1 * s, 0, 7); g.fill(); }
+    else if (k === 'oil' || k === 'ice' || k === 'puddle') { g.fillStyle = k === 'oil' ? '#23202b' : k === 'ice' ? 'rgba(200,235,255,.9)' : 'rgba(80,170,230,.8)'; g.beginPath(); g.ellipse(x, y - .05 * s, .9 * s, .22 * s, 0, 0, 7); g.fill(); g.fillStyle = k === 'oil' ? 'rgba(160,140,255,.4)' : 'rgba(255,255,255,.7)'; g.beginPath(); g.ellipse(x - .3 * s, y - .1 * s, .3 * s, .07 * s, 0, 0, 7); g.fill(); }
+    else if (k === 'car') {
       g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(x, y, 1.05 * s, .2 * s, 0, 0, 7); g.fill();
       g.fillStyle = '#26222c'; g.fillRect(x - .95 * s, y - .38 * s, .32 * s, .38 * s); g.fillRect(x + .63 * s, y - .38 * s, .32 * s, .38 * s);
       g.fillStyle = o.c; arcRound(g, x - .9 * s, y - 1.0 * s, 1.8 * s, .72 * s, .16 * s); g.fill(); arcRound(g, x - .66 * s, y - 1.42 * s, 1.32 * s, .5 * s, .2 * s); g.fill();
       g.fillStyle = 'rgba(30,40,60,.75)'; arcRound(g, x - .55 * s, y - 1.34 * s, 1.1 * s, .36 * s, .12 * s); g.fill();
-      g.fillStyle = '#ff3b3b'; g.fillRect(x - .82 * s, y - .86 * s, .3 * s, .14 * s); g.fillRect(x + .52 * s, y - .86 * s, .3 * s, .14 * s);
+      if (L.moon) { g.shadowColor = '#ff3b3b'; g.shadowBlur = 10; } g.fillStyle = '#ff3b3b'; g.fillRect(x - .82 * s, y - .86 * s, .3 * s, .14 * s); g.fillRect(x + .52 * s, y - .86 * s, .3 * s, .14 * s); g.shadowBlur = 0;
       g.fillStyle = '#fff'; g.fillRect(x - .22 * s, y - .62 * s, .44 * s, .16 * s);
     }
   }
   return {
     steerTo: x => { touched = true; wantX = Math.max(-MAXX, Math.min(MAXX, x)); },   // for testing
-    peek: () => ({ lane, x: carX, dist: pos, done, stars, spin: bumpT + slipT, speed, objs: objs.filter(o => !o.hit && o.w - pos > 0 && o.w - pos < 60).map(o => [o.lane, Math.round(o.w - pos), o.type]) }),
+    setLevel: n => { level = n; reset(); },
+    peek: () => ({ lane, x: carX, dist: pos, done, stars, level, name: L.name, spin: bumpT + slipT, speed, objs: objs.filter(o => !o.hit && o.w - pos > 0 && o.w - pos < 60).map(o => [o.lane, Math.round(o.w - pos), o.type]) }),
     // drag anywhere: the car follows your finger left and right
     down(x, y, id) { touched = true; dragF = { id, x, cx: wantX }; },
     move(x, y, id) { if (!dragF || dragF.id !== id || done) return; wantX = Math.max(-MAXX, Math.min(MAXX, dragF.cx + (x - dragF.x) * PER)); },
@@ -5091,7 +5167,8 @@ function arcRace(a) {
       for (const f of fx) f.t += dt; fx = fx.filter(f => f.t < .8);
       for (const o of objs) if (o.fly > 0) o.fly += dt;
       bumpT = Math.max(0, bumpT - dt); slipT = Math.max(0, slipT - dt); sayT -= dt;
-      const want = done ? 0 : bumpT > 0 ? 12 : Math.min(44, 27 + pos / 70);
+      const round = Math.floor(level / RACE_LEVELS.length), top = Math.min(58, 44 + (level % RACE_LEVELS.length) * 2.5 + round * 4);
+      const want = done ? 0 : bumpT > 0 ? 12 : Math.min(top, 27 + level + pos / 70);
       speed += (want - speed) * Math.min(1, dt * (done ? 1.2 : bumpT > 0 ? 6 : 1.4));
       pos += speed * dt;
       const i0 = Math.floor(pos / SEG); bgX += (seg[Math.min(seg.length - 1, i0)].c) * speed * dt * .35;
@@ -5102,56 +5179,71 @@ function arcRace(a) {
         if (!o.hit && !done && dz > .3 && dz < 3 && Math.abs(laneX(o.lane) - carX) < 1.3) {
           o.hit = true;
           if (o.type === 'star') { stars++; a.score(`⭐ ${stars}`); a.fx.match(); fx.push({ t: 0, x: W / 2 + (laneX(o.lane) - carX) * 60, y: 230 }); }
-          else { a.fx.boing(); if (o.type === 'oil') slipT = .9; else bumpT = .9; if (o.type === 'cone') o.fly = .01; if (sayT <= 0) { sayT = 9; a.say('ar_bump'); } }
+          else { a.fx.boing(); if (BUMP[o.type]) bumpT = .9; else slipT = .9; if (o.type === 'cone') o.fly = .01; if (sayT <= 0) { sayT = 9; a.say('ar_bump'); } }
         }
       }
-      if (done) { doneT += dt; if (doneT > 4.5) reset(); }
+      if (done) { doneT += dt; if (doneT > 4.5) { level++; reset(); } }
       else if (pos >= FIN * SEG) { done = true; doneT = 0; a.fx.win(); a.say('ar_race_win'); a.msg(`🏁 Finish! You got ⭐ ${stars}`, 3200); }
     },
     draw() {
       const roll = -steer * .012 + (slipT > 0 ? Math.sin(slipT * 18) * .07 * slipT : 0), sh = bumpT > .5 ? (Math.random() - .5) * 8 * (bumpT - .5) : 0;
       g.save(); g.translate(W / 2 + sh, H / 2 + sh * .5); g.rotate(roll); g.scale(1.06, 1.06); g.translate(-W / 2, -H / 2);
-      // sky, sun, far mountains and near hills (they slide sideways in the bends)
-      const sky = g.createLinearGradient(0, -20, 0, HOR); sky.addColorStop(0, '#4fa9ff'); sky.addColorStop(1, '#cdeaff'); g.fillStyle = sky; g.fillRect(-40, -40, W + 80, HOR + 42);
-      g.fillStyle = '#fff3b0'; g.beginPath(); g.arc(W * .78, 44, 18, 0, 7); g.fill();
+      // sky, sun or moon, far mountains (or the sea) and near hills; they slide sideways in the bends
+      const sky = g.createLinearGradient(0, -20, 0, HOR); sky.addColorStop(0, L.sky[0]); sky.addColorStop(1, L.sky[1]); g.fillStyle = sky; g.fillRect(-40, -40, W + 80, HOR + 42);
+      for (const [x, y, r] of nightSky) { g.fillStyle = '#fff'; g.globalAlpha = .7; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); } g.globalAlpha = 1;
+      if (L.moon) { g.fillStyle = '#fff6d0'; g.beginPath(); g.arc(W * .78, 40, 15, 0, 7); g.fill(); g.fillStyle = L.sky[0]; g.beginPath(); g.arc(W * .78 + 6, 36, 13, 0, 7); g.fill(); }
+      else { g.fillStyle = L.sun; g.beginPath(); g.arc(W * .78, 44, 18, 0, 7); g.fill(); }
       const ridge = (par, base, amp, col, wl) => { g.fillStyle = col; g.beginPath(); g.moveTo(-40, HOR + 2); for (let x = -40; x <= W + 40; x += 8) { const u = x + bgX * par; g.lineTo(x, base - amp * (.55 + .45 * Math.sin(u / wl) * Math.sin(u / (wl * 2.3) + 1))); } g.lineTo(W + 40, HOR + 2); g.fill(); };
-      ridge(.4, HOR, 46, '#9fb7d8', 70); ridge(1, HOR, 22, '#6fbf6a', 45);
-      g.fillStyle = '#62b85e'; g.fillRect(-40, HOR, W + 80, H - HOR + 40);
-      // the road: work out each slice of road ahead, then draw from far to near so hills hide what's behind them
+      if (L.sea) { g.fillStyle = L.sea; g.fillRect(-40, HOR - 14, W + 80, 16); g.fillStyle = 'rgba(255,255,255,.5)'; for (let i = 0; i < 8; i++) g.fillRect(((i * 70 - bgX * .5) % (W + 80) + W + 80) % (W + 80) - 40, HOR - 9 + (i % 3) * 3, 18, 1.5); }
+      else ridge(.4, HOR, 46, L.far, 70);
+      ridge(1, HOR, L.sea ? 8 : 22, L.near, 45);
+      if (L.moon) { g.fillStyle = '#ffe27a'; for (let i = 0; i < 26; i++) { const x = ((i * 37 - bgX) % (W + 80) + W + 80) % (W + 80) - 40; g.fillRect(x, HOR - 6 - (i * 13 % 30), 2, 2); } }
+      g.fillStyle = L.grass[0]; g.fillRect(-40, HOR, W + 80, H - HOR + 40);
+      // the road ahead, slice by slice
       const i0 = Math.floor(pos / SEG), frac = pos / SEG - i0, camY = roadAt(pos) + CAMH, pts = [];
       let x = 0, dx = -seg[i0].c * frac * CURVE;
       for (let j = 0; j <= DRAW; j++) {
         const idx = Math.min(seg.length - 1, i0 + j), z = Math.max(.6, (i0 + j) * SEG - pos), s = F / z;
-        pts.push({ idx, z, s, x: W / 2 + (x - carX) * s, y: Math.round(HOR + (camY - seg[idx].y) * s), ox: x });   // whole pixels: slices meet exactly, with no shimmering seams
+        pts.push({ idx, z, s, x: W / 2 + (x - carX) * s, y: HOR + (camY - seg[idx].y) * s });
         x += dx; dx += seg[idx].c * CURVE;
       }
-      const inSeg = []; for (let j = 0; j < DRAW; j++) inSeg.push([]);
+      // what you can see: road that dips behind a hilltop is hidden. The visible road is drawn as one smooth shape per stretch,
+      // so there are no seams between slices to flicker
+      const runs = []; let run = null, vis = 1e9; const clipAt = [];
+      for (let j = 1; j <= DRAW; j++) {
+        const p = pts[j];
+        if (p.y < vis) {
+          if (!run) { run = []; runs.push(run); if (j > 1 && vis < 1e8) { const q = pts[j - 1], t = (q.y - vis) / (q.y - p.y); run.push({ x: q.x + (p.x - q.x) * t, s: q.s + (p.s - q.s) * t, y: vis, idx: q.idx, part: true }); } }
+          run.push({ ...p, j }); vis = p.y;
+        } else run = null;
+        clipAt[j] = vis;
+      }
+      const shape = (r, w, off, col) => { if (r.length < 2) return; g.fillStyle = col; g.beginPath(); for (const p of r) g.lineTo(p.x + (off - w) * p.s, p.y); for (let i = r.length - 1; i >= 0; i--) { const p = r[i]; g.lineTo(p.x + (off + w) * p.s, p.y); } g.closePath(); g.fill(); };
+      const quad = (A, B, wa, off, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(A.x + (off - wa) * A.s, A.y); g.lineTo(A.x + (off + wa) * A.s, A.y); g.lineTo(B.x + (off + wa) * B.s, B.y); g.lineTo(B.x + (off - wa) * B.s, B.y); g.fill(); };
+      for (const r of runs) for (let i = 0; i + 1 < r.length; i++) { const A = r[i], B = r[i + 1]; if (Math.floor(A.idx / 3) % 2 && A.y - B.y > 2.5) { g.fillStyle = L.grass[1]; g.fillRect(-40, B.y, W + 80, A.y - B.y); } }
+      for (const r of runs) shape(r, RHW + .55, 0, L.rumble[1]);
+      for (const r of runs) for (let i = 0; i + 1 < r.length; i++) { const A = r[i], B = r[i + 1]; if (Math.floor(A.idx / 3) % 2 && A.y - B.y > 1.5) quad(A, B, RHW + .55, 0, L.rumble[0]); }
+      for (const r of runs) shape(r, RHW, 0, L.road);
+      for (const r of runs) for (let i = 0; i + 1 < r.length; i++) { const A = r[i], B = r[i + 1];
+        if (Math.floor(A.idx / 3) % 2 && A.y - B.y > 1.5) for (const l of [-.5, .5]) quad(A, B, .08, l * LANE, 'rgba(255,255,255,.85)');
+        if ((A.idx === FIN || A.idx === FIN + 1) && !A.part) for (let c = 0; c < 8; c++) { const w = RHW / 4, l0 = -RHW + c * w + w / 2; quad(A, B, w / 2, l0, (c + A.idx) % 2 ? '#fff' : '#26222c'); } }
+      // things by the road and on it, far ones first; each is hidden below the hilltops in front of it
+      const inSeg = []; for (let j = 0; j <= DRAW; j++) inSeg.push([]);
       const place = (w, item) => { const j = Math.floor(w / SEG) - i0; if (j >= 1 && j < DRAW) inSeg[j].push([w, item]); };
       for (const o of scen) place(o.w, o); for (const o of objs) if (!(o.hit && o.type === 'star') && !(o.fly > .8)) place(o.w, o);
-      const quad = (A, B, wa, wb, oa, ob, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(A.x + (oa - wa) * A.s, A.y); g.lineTo(A.x + (oa + wa) * A.s, A.y); g.lineTo(B.x + (ob + wb) * B.s, B.y); g.lineTo(B.x + (ob - wb) * B.s, B.y); g.fill(); };
       for (let j = DRAW - 1; j >= 1; j--) {
-        const A = pts[j], B = pts[j + 1], k = A.idx;
-        if (B.y < A.y) {
-          // stripes only where a slice is tall enough to draw steadily; far away they blend, so nothing shimmers
-          const alt = Math.floor(k / 3) % 2, tall = A.y - B.y > 2.5, Bo = { ...B, y: B.y - 1.2 };   // the road reaches a hair into the slice behind, covering the seam
-          g.fillStyle = tall ? (alt ? '#62b85e' : '#5cb25a') : '#5fb55c'; g.fillRect(-40, B.y, W + 80, A.y - B.y);
-          quad(A, B, RHW + .55, RHW + .55, 0, 0, tall ? (alt ? '#ff5a4e' : '#fff') : '#ffaca6');
-          quad(A, Bo, RHW, RHW, 0, 0, '#676b79');
-          if (alt && tall) for (const l of [-.5, .5]) quad(A, B, .08, .08, l * LANE, l * LANE, 'rgba(255,255,255,.85)');
-          if (k === FIN || k === FIN + 1) for (let c = 0; c < 8; c++) { const w = RHW / 4; g.fillStyle = (c + k) % 2 ? '#fff' : '#26222c'; g.beginPath(); const l0 = -RHW + c * w, l1 = l0 + w; g.moveTo(A.x + l0 * A.s, A.y); g.lineTo(A.x + l1 * A.s, A.y); g.lineTo(B.x + l1 * B.s, B.y); g.lineTo(B.x + l0 * B.s, B.y); g.fill(); }
-        }
-        // things in this slice, the far ones first
+        const A = pts[j], B = pts[j + 1], k = A.idx, cy = (j > 1 ? clipAt[j - 1] : 1e9) + 1;
+        if (!inSeg[j].length && k !== FIN) continue;
+        g.save(); if (cy < 1e8) { g.beginPath(); g.rect(-60, -60, W + 120, cy + 60); g.clip(); }
         inSeg[j].sort((p, q) => q[0] - p[0]);
-        for (const [w, o] of inSeg[j]) {
-          const f = w / SEG - (i0 + j), s = A.s + (B.s - A.s) * f, y = A.y + (B.y - A.y) * f, cx = A.x + (B.x - A.x) * f, ox = o.k ? o.x : laneX(o.lane);
-          sprite(o, cx + ox * s, y, s);
-        }
+        for (const [w, o] of inSeg[j]) { const f = w / SEG - (i0 + j), s = A.s + (B.s - A.s) * f, y = A.y + (B.y - A.y) * f, cx = A.x + (B.x - A.x) * f, ox = o.k ? o.x : laneX(o.lane); sprite(o, cx + ox * s, y, s); }
         if (k === FIN) {   // the finish banner over the road
-          const s = A.s, y = A.y, L = A.x - (RHW + .6) * s, R = A.x + (RHW + .6) * s;
-          g.fillStyle = '#e8e8f0'; g.fillRect(L - .15 * s, y - 5.5 * s, .3 * s, 5.5 * s); g.fillRect(R - .15 * s, y - 5.5 * s, .3 * s, 5.5 * s);
-          g.fillStyle = '#ff5a4e'; g.fillRect(L, y - 5.6 * s, R - L, 1.2 * s);
+          const s = A.s, y = A.y, Lx = A.x - (RHW + .6) * s, Rx = A.x + (RHW + .6) * s;
+          g.fillStyle = '#e8e8f0'; g.fillRect(Lx - .15 * s, y - 5.5 * s, .3 * s, 5.5 * s); g.fillRect(Rx - .15 * s, y - 5.5 * s, .3 * s, 5.5 * s);
+          g.fillStyle = '#ff5a4e'; g.fillRect(Lx, y - 5.6 * s, Rx - Lx, 1.2 * s);
           if (s > 3) arcText(g, 'FINISH', A.x, y - 5 * s, Math.max(6, .8 * s), '#fff');
         }
+        g.restore();
       }
       g.restore();
       // stars you grabbed
@@ -5567,12 +5659,12 @@ function arcBricks(a) {
 // ---- Skee-Ball: you stand at the end of the lane. Flick up to roll: the flick's speed sets how hard, its angle aims.
 // The ball rolls up the lane, jumps off the ramp, bounces on the tilted board, and drops into whichever hole it rolls into. 9 balls a game ----
 function arcSkee(a) {
-  const { g, W, H } = a, F = 600, CY = 160, CAMY = 1.2, CAMZ = -.2, PH = .2, cP = Math.cos(PH), sP = Math.sin(PH), GR = 9.8;
-  const R = .065, LW = .6, LZ0 = 1.75, BALLZ = 2.0, LE = 3.2, RL = .45, RH = .2, BZ = 3.25, TH = .56, cT = Math.cos(TH), sT = Math.sin(TH), BL = 2.5, BW = .72, SC = 1.45;
+  const { g, W, H } = a, F = 570, CY = 172, CAMY = 1.25, CAMZ = -.3, PH = .22, cP = Math.cos(PH), sP = Math.sin(PH), GR = 9.8;
+  const R = .065, LW = .6, LZ0 = 1.75, BALLZ = 2.0, LE = 3.2, RL = .45, RH = .2, BZ = 3.25, TH = .56, cT = Math.cos(TH), sT = Math.sin(TH), BL = 2.7, BW = 1.06, SC = 1.45;   // wide enough that a ball always fits between the rings, the cups and the walls
   // the board: rings around (0, SC), each ring's hole at the low end of its band (a ball that drops inside a ring rolls down into it)
   const RINGS = [.36, .6, .84], CUP = .13;
-  const HOLES = [{ x: 0, s: SC, r: CUP, p: 50 }, { x: 0, s: SC - .27, r: .085, p: 40 }, { x: 0, s: SC - .51, r: .085, p: 30 }, { x: 0, s: SC - .75, r: .085, p: 20 }, { x: -.58, s: 2.25, r: .085, p: 100 }, { x: .58, s: 2.25, r: .085, p: 100 }];
-  const LIPS = [[0, SC, CUP], ...RINGS.map(r => [0, SC, r]), [-.58, 2.25, .12], [.58, 2.25, .12]];
+  const HOLES = [{ x: 0, s: SC, r: CUP, p: 50 }, { x: 0, s: SC - .27, r: .085, p: 40 }, { x: 0, s: SC - .51, r: .085, p: 30 }, { x: 0, s: SC - .75, r: .085, p: 20 }, { x: -.62, s: 2.42, r: .08, p: 100 }, { x: .62, s: 2.42, r: .08, p: 100 }];
+  const LIPS = [[0, SC, CUP], ...RINGS.map(r => [0, SC, r]), [-.62, 2.42, .1], [.62, 2.42, .1]];
   const P = (x, y, z) => { const ry = y - CAMY, rz = z - CAMZ, d = rz * cP - ry * sP; if (d < .1) return null; const u = ry * cP + rz * sP, k = F / d; return [W / 2 + x * k, CY - u * k, k]; };
   const B = (x, s, h = 0) => P(x, s * sT + h * cT, BZ + s * cT - h * sT);   // a point on the board
   const laneY = z => z <= LE - RL ? 0 : RH * ((Math.min(z, LE) - (LE - RL)) / RL) ** 2, laneSlope = z => z <= LE - RL ? 0 : 2 * RH * (Math.min(z, LE) - (LE - RL)) / RL / RL;
@@ -5627,8 +5719,11 @@ function arcSkee(a) {
       // the holes: rolling slowly over one, it drops in
       const sp = Math.hypot(b.vs, b.vx);
       for (const o of HOLES) if (b.h < .03 && Math.hypot(b.x - o.x, b.s - o.s) < o.r - R * .1 && sp < (o.p === 50 ? 4.5 : 4)) { b.ph = 'sink'; b.hole = o; b.t = 0; b.sx0 = b.x; b.ss0 = b.s; return; }
+      // a ball that comes to rest somewhere (tucked against a ring or in a corner) gets a nudge downhill, like a real one settling
+      if (b.h === 0 && sp < .25) b.slow = (b.slow || 0) + d; else b.slow = 0;
+      if (b.slow > .6) { b.slow = 0; b.vs -= .5; b.vx += (b.x > 0 ? -1 : 1) * (.4 + Math.random() * .4); }
       if (b.s < -R) { b.ph = 'gutter'; b.t = 0; }
-      else if (b.t > 7) { b.ph = 'gutter'; b.t = 0; }
+      else if (b.t > 6) { b.ph = 'gutter'; b.t = 0; }
     }
   }
   return {
