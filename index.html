@@ -5210,10 +5210,10 @@ function arcRace(a) {
       // what you can see: road that dips behind a hilltop is hidden. The visible road is drawn as one smooth shape per stretch,
       // so there are no seams between slices to flicker
       const runs = []; let run = null, vis = 1e9; const clipAt = [];
-      for (let j = 1; j <= DRAW; j++) {
+      for (let j = 0; j <= DRAW; j++) {   // from right under the car (j = 0), so the road always reaches the bottom of the view
         const p = pts[j];
         if (p.y < vis) {
-          if (!run) { run = []; runs.push(run); if (j > 1 && vis < 1e8) { const q = pts[j - 1], t = (q.y - vis) / (q.y - p.y); run.push({ x: q.x + (p.x - q.x) * t, s: q.s + (p.s - q.s) * t, y: vis, idx: q.idx, part: true }); } }
+          if (!run) { run = []; runs.push(run); if (j > 0 && vis < 1e8) { const q = pts[j - 1], t = (q.y - vis) / (q.y - p.y); run.push({ x: q.x + (p.x - q.x) * t, s: q.s + (p.s - q.s) * t, y: vis, idx: q.idx, part: true }); } }
           run.push({ ...p, j }); vis = p.y;
         } else run = null;
         clipAt[j] = vis;
