@@ -4972,21 +4972,33 @@ const LUNAR_LEVELS = [
   { name: 'Ice Canyon', icon: '🧊', sky: ['#061428', '#1d4a6a'], ground: '#bfe6ff', crater: '#8cc8ea', grav: 31, shape: 'canyon', spikes: true },
   { name: 'Alien Planet', icon: '👽', sky: ['#12062a', '#3d1a5c'], ground: '#5fbf6a', crater: '#3f9a4a', grav: 30, shape: 'hills', movingPad: true, ufo: true },
   { name: 'Space Station', icon: '🛰️', sky: ['#03040c', '#121a3a'], ground: '#6a7088', crater: '#4f5570', grav: 32, shape: 'flat', beams: true },
+  { name: 'Volcano Valley', icon: '🌋', sky: ['#1a0606', '#5a1a0e'], ground: '#4a2a26', crater: '#ff6a1c', grav: 31, shape: 'hills', fire: 3, lava: true },
+  { name: 'Crystal Cave', icon: '💎', sky: ['#0a0618', '#24163f'], ground: '#5a4a7a', crater: '#7a62a8', grav: 30, shape: 'hills', cave: true },
+  { name: 'Ring Run', icon: '🪐', sky: ['#060a1a', '#1c2050'], ground: '#a89a7a', crater: '#8a7c5e', grav: 30, shape: 'hills', bands: true },
+  { name: 'Comet Ride', icon: '☄️', sky: ['#040814', '#14284a'], ground: '#8aa0b8', crater: '#6a8098', grav: 30, shape: 'hills', movingPad: true, rocks: 2 },
+  { name: 'Jelly Sea', icon: '🪼', sky: ['#062a3a', '#0e5a6a'], ground: '#e8c890', crater: '#d0ac70', grav: 26, shape: 'hills', jelly: 3 },
+  { name: 'Double Gate', icon: '🚧', sky: ['#03040c', '#16163a'], ground: '#6a7088', crater: '#4f5570', grav: 31, shape: 'flat', gates: 2 },
+  { name: 'Tiny Moon', icon: '🌑', sky: ['#05050c', '#1a1a2a'], ground: '#b0b0ba', crater: '#8a8a96', grav: 18, shape: 'mesa', tinyPad: true },
+  { name: 'Storm World', icon: '⛈️', sky: ['#14182a', '#3a4460'], ground: '#5a6a5a', crater: '#46584a', grav: 31, shape: 'hills', wind: 28, clouds: 2 },
+  { name: 'Black Hole', icon: '🕳️', sky: ['#020208', '#120a24'], ground: '#55506a', crater: '#3e3a52', grav: 28, shape: 'hills', hole: true },
+  { name: 'Satellite Swarm', icon: '📡', sky: ['#03040c', '#101838'], ground: '#7a8098', crater: '#5a6078', grav: 30, shape: 'hills', sats: 3 },
 ];
 function arcLunar(a) {
-  const { g, W, H } = a; let level = 0, landed = 0, s, ground, touched = false, rumbleT = 0, L, obs = [], pad, dust = [], introT = 0;
+  const { g, W, H } = a; let level = 0, landed = 0, s, ground, ceil = null, touched = false, rumbleT = 0, L, obs = [], pad, dust = [], introT = 0;
   const sky = [...Array(70)].map(() => [Math.random() * W, Math.random() * H * .75, Math.random() * 1.4 + .4, Math.random() * 6]);
   const hold = new Map();
   function reset(fresh) {
     L = LUNAR_LEVELS[level % LUNAR_LEVELS.length]; const round = Math.floor(level / LUNAR_LEVELS.length);
-    const padW = Math.max(64, 112 - round * 14 + (L.movingPad ? 16 : 0)), base = H - 46;
+    const padW = Math.max(L.tinyPad ? 50 : 64, (L.tinyPad ? 72 : 112) - round * 14 + (L.movingPad ? 16 : 0)), base = H - 46;
     let padX = 80 + Math.random() * (W - 160), padY = base;
     if (L.shape === 'canyon') { padX = W / 2 + (Math.random() - .5) * 60; padY = H - 30; }   // down at the bottom, between icy cliffs
+    if (L.shape === 'mesa') { padX = 120 + Math.random() * (W - 240); padY = H - 130; }   // up on top of a tall rock
     ground = [];
     for (let x = 0; x <= W + 20; x += 20) {
       let y = base - Math.sin(x * .028 + level * 1.7) * 14 - Math.cos(x * .071 + level) * 7;
       if (L.shape === 'flat') y = base + Math.sin(x * .2) * 2;
       if (L.shape === 'canyon') { const d = Math.abs(x - padX); y = d < 70 ? H - 30 : Math.max(150, H - 30 - (d - 70) * 2.2); }
+      if (L.shape === 'mesa') y = H - 26 - Math.sin(x * .05) * 4;
       if (!L.movingPad && Math.abs(x - padX) <= padW / 2 + 12) y = padY;
       ground.push([x, y]);
     }
@@ -4994,14 +5006,25 @@ function arcLunar(a) {
     if (L.movingPad) pad = { x: W / 2, y: H - 104, w: padW, vx: 26 + round * 8, float: true };   // a platform that glides back and forth
     let x0 = 60 + Math.random() * (W - 120); if (Math.abs(x0 - pad.x) < 70) x0 = (pad.x + W / 2) % (W - 120) + 60;
     if (L.shape === 'canyon') x0 = pad.x + (Math.random() < .5 ? -1 : 1) * 150;
-    s = { x: Math.max(30, Math.min(W - 30, x0)), y: 36, vx: 0, vy: 10, flame: 0, over: false, win: false, t: 0, why: '' };
+    ceil = L.cave ? ground.map(([x]) => [x, 34 + Math.sin(x * .04 + level) * 10 + Math.cos(x * .11) * 5]) : null;
+    s = { x: Math.max(30, Math.min(W - 30, x0)), y: L.cave ? 82 : 36, vx: 0, vy: 10, flame: 0, over: false, win: false, t: 0, why: '' };
     obs = [];
     if (L.rocks) for (let i = 0; i < L.rocks + round; i++) obs.push({ k: 'rock', x: Math.random() * W, y: 110 + i * 46 % 150 + Math.random() * 20, r: 13 + Math.random() * 8, vx: (Math.random() < .5 ? -1 : 1) * (22 + Math.random() * 20 + round * 6), rot: Math.random() * 6 });
     if (L.spikes) for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const x = pad.x + sx * (86 + i * 34); obs.push({ k: 'spike', x, y: groundAtX(x) - 10, r: 9 }); }
     if (L.ufo) obs.push({ k: 'ufo', x: W / 2, y: 150, r: 18, ph: Math.random() * 6 });
     if (L.beams) { const gap = 92 - round * 8, gx = pad.x + (Math.random() - .5) * 80; obs.push({ k: 'beam', x: 0, y: 150, w: Math.max(20, gx - gap / 2), h: 14 }, { k: 'beam', x: gx + gap / 2, y: 150, w: W - (gx + gap / 2), h: 14 }); }
+    // the new places' hazards
+    if (L.fire) for (let i = 0; i < L.fire + round; i++) { const x = 40 + ((i + .5) / (L.fire + round)) * (W - 80); if (Math.abs(x - pad.x) < pad.w / 2 + 20) continue; obs.push({ k: 'fire', x, gy: groundAtX(x), y: H, r: 11, ph: i * 1.7, amp: 130 + i * 25 % 60 }); }
+    if (L.cave) for (let x = 30; x < W; x += 72) { if (Math.abs(x - s.x) < 55) continue; const cy = ceilAt(x); { const len = 24 + (x * 7 % 28); obs.push({ k: 'icicle', x, top: cy, len, y: cy + len * .55, r: 9 }); } }
+    if (L.bands) for (const [y, vx, n] of [[135, 34, 3], [215, -42, 3]]) for (let i = 0; i < n + round; i++) obs.push({ k: 'rock', x: i * W / (n + round) + Math.random() * 30, y: y + (Math.random() - .5) * 10, r: 11 + Math.random() * 5, vx: vx * (1 + round * .15), rot: Math.random() * 6 });
+    if (L.jelly) for (let i = 0; i < L.jelly + round; i++) { let x = 50 + ((i + .5) / (L.jelly + round)) * (W - 100); if (Math.abs(x - pad.x) < 60) x += x < pad.x ? -40 : 40; /* keep the way down to the pad open */ obs.push({ k: 'jelly', x, by: 150 + (i % 2) * 50, y: 150, r: 15, ph: i * 1.3 }); }
+    if (L.gates) [[120, .3], [215, .7]].forEach(([y, f], i) => { const gap = 96 - round * 8, gx = i ? pad.x + (Math.random() - .5) * 60 : W * f + (Math.random() - .5) * 80; obs.push({ k: 'beam', x: 0, y, w: Math.max(10, gx - gap / 2), h: 14 }, { k: 'beam', x: gx + gap / 2, y, w: Math.max(10, W - (gx + gap / 2)), h: 14 }); });
+    if (L.clouds) for (let i = 0; i < L.clouds + round; i++) obs.push({ k: 'cloud', x: Math.random() * W, y: 130 + i * 70 % 140, r: 22, vx: (i % 2 ? -1 : 1) * (26 + i * 6) });
+    if (L.hole) { const hx = pad.x < W / 2 ? W - 110 : 110; obs.push({ k: 'hole', x: hx, y: 160, r: 16, pull: 5200 }); }
+    if (L.sats) for (let i = 0; i < L.sats + round; i++) obs.push({ k: 'sat', cx: W / 2, cy: 180, R: 70 + i * 34, ph: i * 2.1, w: (i % 2 ? -1 : 1) * (.5 + i * .08), x: 0, y: 0, r: 13 });
     if (fresh) { introT = 2.2; a.msg(`${L.icon} Level ${level + 1}: ${L.name}`, 2000); }
   }
+  function ceilAt(x) { if (!ceil) return -99; const i = Math.max(0, Math.min(ceil.length - 2, Math.floor(x / 20))); const [x0, y0] = ceil[i], [x1, y1] = ceil[i + 1]; return y0 + (y1 - y0) * ((x - x0) / (x1 - x0)); }
   function groundAtX(x) { const i = Math.max(0, Math.min(ground.length - 2, Math.floor(x / 20))); const [x0, y0] = ground[i], [x1, y1] = ground[i + 1]; return y0 + (y1 - y0) * ((x - x0) / (x1 - x0)); }
   reset(true); a.score(`🌙 ${landed}`);
   const SAFE = 58;   // landing slower than this is soft
@@ -5014,7 +5037,12 @@ function arcLunar(a) {
     down(x, y, id) { hold.set(id, [x, y]); touched = true; }, move(x, y, id) { if (hold.has(id)) hold.set(id, [x, y]); }, up(x, y, id) { hold.delete(id); },
     update(dt) {
       for (const st of sky) st[3] += dt; introT -= dt;
-      for (const o of obs) { if (o.k === 'rock') { o.x += o.vx * dt; o.rot += dt * o.vx / 30; if (o.x < -30) o.x = W + 30; if (o.x > W + 30) o.x = -30; } if (o.k === 'ufo') { o.ph += dt; o.x = W / 2 + Math.sin(o.ph * .5) * (W / 2 - 60); o.y = 130 + Math.sin(o.ph * 1.1) * 20; } }
+      for (const o of obs) {
+        if (o.k === 'fire') { o.ph += dt * 1.3; const u = Math.abs(Math.sin(o.ph)); o.y = o.gy - 6 - u * o.amp; o.show = u > .05; }
+        else if (o.k === 'jelly') { o.ph += dt * 1.2; o.y = o.by + Math.sin(o.ph) * 32; }
+        else if (o.k === 'cloud') { o.x += o.vx * dt; if (o.x < -40) o.x = W + 40; if (o.x > W + 40) o.x = -40; }
+        else if (o.k === 'sat') { o.ph += o.w * dt; o.x = o.cx + Math.cos(o.ph) * o.R; o.y = o.cy + Math.sin(o.ph) * o.R * .55; }
+        if (o.k === 'rock') { o.x += o.vx * dt; o.rot += dt * o.vx / 30; if (o.x < -30) o.x = W + 30; if (o.x > W + 30) o.x = -30; } if (o.k === 'ufo') { o.ph += dt; o.x = W / 2 + Math.sin(o.ph * .5) * (W / 2 - 60); o.y = 130 + Math.sin(o.ph * 1.1) * 20; } }
       if (pad.float) { pad.x += pad.vx * dt; if (pad.x > W - pad.w / 2 - 10) { pad.x = W - pad.w / 2 - 10; pad.vx = -Math.abs(pad.vx); } if (pad.x < pad.w / 2 + 10) { pad.x = pad.w / 2 + 10; pad.vx = Math.abs(pad.vx); } }
       if (L.wind) for (const d of dust) { d[0] += (L.wind * Math.sin(performance.now() / 1400) * 3 + 20) * dt; if (d[0] > W) d[0] -= W; if (d[0] < 0) d[0] += W; }
       if (L.wind && dust.length < 40) dust.push([Math.random() * W, Math.random() * H, Math.random() * 1.5 + .5]);
@@ -5022,6 +5050,7 @@ function arcLunar(a) {
       const h = [...hold.values()][0], round = Math.floor(level / LUNAR_LEVELS.length);
       s.vy += (L.grav + Math.min(round, 3) * 3) * dt;
       if (L.wind) s.vx += L.wind * Math.sin(performance.now() / 1400) * dt;   // gusts push you sideways
+      for (const o of obs) if (o.k === 'hole') { const dx = o.x - s.x, dy = o.y - s.y, d = Math.hypot(dx, dy) || 1, f = o.pull / (d + 60); s.vx += dx / d * f * dt; s.vy += dy / d * f * dt; }   // the black hole pulls you toward it
       if (h) {
         s.vy -= 78 * dt; s.vx += Math.max(-80, Math.min(80, (h[0] - s.x) * 2)) * dt; s.flame = Math.min(1, s.flame + dt * 6);
         rumbleT -= dt; if (rumbleT <= 0) { rumbleT = .32; a.fx.rumble(.08); }
@@ -5031,8 +5060,10 @@ function arcLunar(a) {
       // bumping into things
       for (const o of obs) {
         if (o.k === 'beam') { if (s.x + 9 > o.x && s.x - 9 < o.x + o.w && s.y + 18 > o.y && s.y - 20 < o.y + o.h) return crash('bonk'); }
+        else if (o.k === 'fire' && !o.show) continue;
         else if (Math.hypot(s.x - o.x, s.y - o.y) < o.r + 11) return crash('bonk');
       }
+      if (ceil && s.y - 22 < ceilAt(s.x)) return crash('bonk');   // the cave roof
       // a floating pad: land on its top
       if (pad.float && s.vy > 0 && py0 + 20 <= pad.y + 2 && s.y + 20 >= pad.y && Math.abs(s.x - pad.x) < pad.w / 2 + 6) {
         s.y = pad.y - 20; if (Math.abs(s.x - pad.x) < pad.w / 2 - 4) { s.on = true; return land(); } return crash('off');
@@ -5048,10 +5079,17 @@ function arcLunar(a) {
       else if (L.wind) { g.fillStyle = '#ffd9a0'; g.beginPath(); g.arc(W - 60, 52, 12, 0, 7); g.fill(); }
       else if (L.ufo) { g.fillStyle = '#ff9fd6'; g.beginPath(); g.arc(W - 70, 60, 22, 0, 7); g.fill(); g.strokeStyle = '#ffd6f0'; g.lineWidth = 3; g.beginPath(); g.ellipse(W - 70, 60, 36, 8, -.3, 0, 7); g.stroke(); }
       else if (L.shape === 'canyon') { g.fillStyle = '#e6f6ff'; g.beginPath(); g.arc(70, 54, 18, 0, 7); g.fill(); }
+      else if (L.bands) { g.fillStyle = '#e8c890'; g.beginPath(); g.arc(W - 70, 70, 26, 0, 7); g.fill(); g.strokeStyle = '#c9a870'; g.lineWidth = 4; g.beginPath(); g.ellipse(W - 70, 70, 46, 11, -.25, 0, 7); g.stroke(); g.strokeStyle = 'rgba(200,180,140,.18)'; g.lineWidth = 34; for (const y of [135, 215]) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); } }
+      else if (L.jelly) { g.fillStyle = 'rgba(255,255,255,.12)'; for (let i = 0; i < 12; i++) { const t = performance.now() / 2000 + i; g.beginPath(); g.arc((i * 61) % W, H - ((t * 40 + i * 37) % H), 3 + i % 3, 0, 7); g.fill(); } }
+      else if (L.lava) { g.fillStyle = '#2a1210'; g.beginPath(); g.moveTo(W - 190, H - 40); g.lineTo(W - 105, 92); g.lineTo(W - 75, 92); g.lineTo(W + 10, H - 40); g.fill(); g.fillStyle = '#ff6a1c'; g.beginPath(); g.ellipse(W - 90, 92, 16, 5, 0, 0, 7); g.fill(); g.fillStyle = 'rgba(255,140,60,.35)'; for (let i = 0; i < 4; i++) { const t = (performance.now() / 1200 + i * .25) % 1; g.beginPath(); g.arc(W - 90 + Math.sin(i * 2) * 10, 88 - t * 50, 6 + t * 10, 0, 7); g.fill(); } }
+      else if (L.clouds) { if (Math.sin(performance.now() / 900) > .97) { g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(0, 0, W, H); } }
       // the wind, shown as blowing dust and an arrow
       if (L.wind) { const w = Math.sin(performance.now() / 1400); g.fillStyle = 'rgba(255,200,150,.5)'; for (const [x, y, r] of dust) g.fillRect(x, y, r * 4, r); arcText(g, w > 0 ? '💨 →' : '← 💨', W / 2, 24, 18, '#ffd9a0'); }
-      // the ground and the pad
+      // the ground and the pad (and the cave roof)
+      if (ceil) { g.fillStyle = '#3a2a5a'; g.beginPath(); g.moveTo(0, 0); ceil.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(W, 0); g.closePath(); g.fill(); }
+      if (L.shape === 'mesa') { const lw = pad.w / 2 + 14; g.fillStyle = L.crater; g.beginPath(); g.moveTo(pad.x - lw - 10, H); g.lineTo(pad.x - lw, pad.y + 4); g.lineTo(pad.x + lw, pad.y + 4); g.lineTo(pad.x + lw + 10, H); g.fill(); g.fillStyle = L.ground; g.fillRect(pad.x - lw, pad.y + 2, lw * 2, 8); }
       g.fillStyle = L.ground; g.beginPath(); g.moveTo(0, H); ground.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(W, H); g.closePath(); g.fill();
+      if (L.lava) { g.strokeStyle = '#ff6a1c'; g.lineWidth = 4; g.shadowColor = '#ff6a1c'; g.shadowBlur = 10; g.beginPath(); ground.forEach(([x, y]) => g.lineTo(x, y + 2)); g.stroke(); g.shadowBlur = 0; }
       g.fillStyle = L.crater; [[60, 22, 12], [190, 26, 9], [330, 20, 14], [430, 28, 8]].forEach(([x, dy, r]) => { if (L.shape === 'canyon') return; g.beginPath(); g.ellipse(x, H - dy, r, r * .4, 0, 0, 7); g.fill(); });
       if (pad.float) { g.strokeStyle = 'rgba(160,255,200,.5)'; g.lineWidth = 3; g.setLineDash([4, 5]); g.beginPath(); g.moveTo(pad.x, pad.y + 8); g.lineTo(pad.x, groundAtX(pad.x)); g.stroke(); g.setLineDash([]); g.fillStyle = '#5a5f78'; arcRound(g, pad.x - pad.w / 2 - 4, pad.y + 3, pad.w + 8, 8, 4); g.fill(); }
       g.fillStyle = '#ffd23f'; arcRound(g, pad.x - pad.w / 2, pad.y - 3, pad.w, 8, 3); g.fill();
@@ -5061,6 +5099,12 @@ function arcLunar(a) {
         if (o.k === 'rock') { g.save(); g.translate(o.x, o.y); g.rotate(o.rot); g.fillStyle = '#8a7a6a'; g.strokeStyle = '#3a3340'; g.lineWidth = 2; g.beginPath(); for (let i = 0; i < 8; i++) { const t = i / 8 * Math.PI * 2, rr = o.r * (.8 + .2 * Math.sin(i * 2.3)); g.lineTo(Math.cos(t) * rr, Math.sin(t) * rr); } g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#6c5e50'; g.beginPath(); g.arc(-o.r * .3, -o.r * .2, o.r * .25, 0, 7); g.arc(o.r * .3, o.r * .3, o.r * .18, 0, 7); g.fill(); g.restore(); }
         else if (o.k === 'spike') { g.fillStyle = '#7fd8ff'; g.strokeStyle = '#2a6a9a'; g.lineWidth = 2; g.beginPath(); g.moveTo(o.x - 9, o.y + 10); g.lineTo(o.x - 3, o.y - 14); g.lineTo(o.x + 2, o.y + 2); g.lineTo(o.x + 6, o.y - 10); g.lineTo(o.x + 10, o.y + 10); g.closePath(); g.fill(); g.stroke(); }
         else if (o.k === 'ufo') { g.fillStyle = '#b8f5c8'; g.beginPath(); g.ellipse(o.x, o.y - 6, 10, 9, 0, Math.PI, 0); g.fill(); g.fillStyle = '#9a9ab8'; g.strokeStyle = '#3a3340'; g.lineWidth = 2; g.beginPath(); g.ellipse(o.x, o.y, 22, 7, 0, 0, 7); g.fill(); g.stroke(); for (let i = -1; i <= 1; i++) { g.fillStyle = (Math.floor(performance.now() / 200) + i) % 2 ? '#ffd23f' : '#ff5ab0'; g.beginPath(); g.arc(o.x + i * 11, o.y + 1, 2.4, 0, 7); g.fill(); } }
+        else if (o.k === 'fire') { if (!o.show) continue; g.fillStyle = 'rgba(255,160,40,.35)'; g.beginPath(); g.moveTo(o.x - 7, o.y); g.lineTo(o.x, o.y + 34); g.lineTo(o.x + 7, o.y); g.fill(); g.fillStyle = '#ff6a1c'; g.beginPath(); g.arc(o.x, o.y, o.r, 0, 7); g.fill(); g.fillStyle = '#ffe27a'; g.beginPath(); g.arc(o.x - 2, o.y - 2, o.r * .5, 0, 7); g.fill(); }
+        else if (o.k === 'icicle') { g.fillStyle = '#c9a8ff'; g.strokeStyle = '#7a5ac8'; g.lineWidth = 2; g.beginPath(); g.moveTo(o.x - 9, o.top - 4); g.lineTo(o.x + 9, o.top - 4); g.lineTo(o.x, o.top + o.len); g.closePath(); g.fill(); g.stroke(); g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(o.x - 3, o.top, 2, o.len * .5); }
+        else if (o.k === 'jelly') { g.fillStyle = 'rgba(255,140,220,.85)'; g.beginPath(); g.arc(o.x, o.y, o.r, Math.PI, 0); g.lineTo(o.x + o.r, o.y + 3); g.lineTo(o.x - o.r, o.y + 3); g.fill(); g.strokeStyle = 'rgba(255,170,230,.8)'; g.lineWidth = 2; for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(o.x + i * 5, o.y + 3); g.quadraticCurveTo(o.x + i * 5 + Math.sin(o.ph * 3 + i) * 4, o.y + 14, o.x + i * 5, o.y + 22); g.stroke(); } g.fillStyle = '#3a3340'; g.beginPath(); g.arc(o.x - 5, o.y - 4, 1.8, 0, 7); g.arc(o.x + 5, o.y - 4, 1.8, 0, 7); g.fill(); }
+        else if (o.k === 'cloud') { g.fillStyle = '#5a6280'; g.beginPath(); g.arc(o.x - 14, o.y + 2, 13, 0, 7); g.arc(o.x, o.y - 6, 17, 0, 7); g.arc(o.x + 15, o.y + 2, 13, 0, 7); g.fill(); g.fillStyle = '#ffd23f'; g.beginPath(); g.moveTo(o.x, o.y + 10); g.lineTo(o.x - 6, o.y + 22); g.lineTo(o.x + 1, o.y + 21); g.lineTo(o.x - 4, o.y + 32); g.lineTo(o.x + 8, o.y + 16); g.lineTo(o.x + 1, o.y + 17); g.fill(); }
+        else if (o.k === 'hole') { const t = performance.now() / 600; g.fillStyle = 'rgba(154,107,255,.18)'; g.beginPath(); g.arc(o.x, o.y, 70, 0, 7); g.fill(); g.strokeStyle = '#b27cff'; g.lineWidth = 3; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(o.x, o.y, 22 + i * 13, t + i * 2, t + i * 2 + 4); g.stroke(); } g.fillStyle = '#000'; g.beginPath(); g.arc(o.x, o.y, o.r, 0, 7); g.fill(); g.strokeStyle = '#ff9fd6'; g.lineWidth = 2; g.stroke(); }
+        else if (o.k === 'sat') { g.save(); g.translate(o.x, o.y); g.rotate(o.ph); g.fillStyle = '#4a8bff'; g.fillRect(-20, -5, 12, 10); g.fillRect(8, -5, 12, 10); g.fillStyle = '#c9ced8'; g.strokeStyle = '#3a3340'; g.lineWidth = 2; g.fillRect(-7, -7, 14, 14); g.strokeRect(-7, -7, 14, 14); g.fillStyle = '#ff5a4e'; g.beginPath(); g.arc(0, -10, 2.4, 0, 7); g.fill(); g.restore(); }
         else if (o.k === 'beam') { g.fillStyle = '#8a93a8'; g.strokeStyle = '#3a3340'; g.lineWidth = 2; g.fillRect(o.x, o.y, o.w, o.h); g.strokeRect(o.x, o.y, o.w, o.h); g.strokeStyle = '#ffd23f'; g.lineWidth = 3; g.setLineDash([8, 8]); g.beginPath(); g.moveTo(o.x, o.y + o.h / 2); g.lineTo(o.x + o.w, o.y + o.h / 2); g.stroke(); g.setLineDash([]); }
       }
       // the rocket
