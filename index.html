@@ -1576,7 +1576,7 @@ const Sound = (() => {
     let e = files[url];
     if (!e) {
       e = files[url] = { v: null, used: 0 };
-      e.p = fetch(url).then(r => { if (!r.ok) throw new Error('missing'); return r.arrayBuffer(); })
+      e.p = fetch(url, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('missing'); return r.arrayBuffer(); })
         .then(ab => { e.v = { ab, frames: frameInfo(ab) }; evict(files, v => v.ab.byteLength, BYTE_BUDGET, url); return e.v; })
         .catch(() => { if (files[url] === e) delete files[url]; return null; });
     }
