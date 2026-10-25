@@ -5999,33 +5999,38 @@ function arcSkee(a) {
   };
 }
 
-// ---- Hoop Shot: you stand at the line in a gym. Flick the ball up at the hoop: the flick's speed sets how far it goes, its angle aims.
-// The ball bounces off the rim and the backboard for real; 45 seconds a round; score enough to move up a level (then the hoop starts moving) ----
+// ---- Hoop Shot: an arcade pop-a-shot machine. Flick a ball up at the hoop: the flick's speed sets how far it goes, its angle aims.
+// Nets on the sides and top and a full backboard keep every ball in the machine; balls roll back down the ramp to your tray.
+// 45 seconds a round; score enough to move up a level (then the hoop starts moving) ----
 const BB_LEVELS = [
-  { need: 8, z: 4.4, move: 0 }, { need: 10, z: 4.6, move: 0 }, { need: 10, z: 4.6, move: .5 }, { need: 12, z: 5.0, move: .6 },
-  { need: 12, z: 4.8, move: .9, bob: .25 }, { need: 14, z: 5.2, move: 1.0, bob: .3 }, { need: 16, z: 5.4, move: 1.2, bob: .35 },
+  { need: 8, z: 4.4, move: 0 }, { need: 10, z: 4.6, move: 0 }, { need: 10, z: 4.6, move: .35 }, { need: 12, z: 4.9, move: .4 },
+  { need: 12, z: 4.7, move: .5, bob: .2 }, { need: 14, z: 5.0, move: .55, bob: .25 }, { need: 16, z: 5.2, move: .6, bob: .3 },
 ];
 function arcBasket(a) {
-  const { g, W, H } = a, F = 520, CAMY = 1.45, CY = 214, GR = 9.8, BR = .12, RIM = .3, HY = 2.6, BZ0 = 1.3, BY0 = 1.24, ROUND = 45;
+  const { g, W, H } = a, F = 380, CAMY = 1.5, CY = 230, GR = 9.8, BR = .12, RIM = .3, HY = 2.6, BZ0 = 1.3, BY0 = 1.24, ROUND = 45;
+  const SIDE = 1.15, ROOF = 3.75, FRONT = 1.1, TRAY = 4;
   const P = (x, y, z) => z < .3 ? null : [W / 2 + x * F / z, CY - (y - CAMY) * F / z, F / z];
-  let lv = 0, Lv, hoop, balls, ready, readyT, clock, score, made, streak, fire, over, overT, sx = null, sy = 0, trail = [], touched = false, netSw = 0, floats = [], sparks = [], aim = null;
+  const rampY = z => .85 + Math.max(0, z - FRONT) * .12;   // the ramp slopes down toward you, so balls roll back
+  let lv = 0, Lv, hoop, balls, tray, readyT, clock, score, made, streak, fire, over, overT, sx = null, sy = 0, trail = [], touched = false, netSw = 0, floats = [], sparks = [], aim = null, time = 0;
+  const bz = () => hoop.z + RIM + .12;
   function start(keep) {
     Lv = BB_LEVELS[Math.min(lv, BB_LEVELS.length - 1)]; const extra = Math.max(0, lv - BB_LEVELS.length + 1);
-    hoop = { x: 0, y: HY, z: Lv.z, t: 0, move: Lv.move + extra * .2, bob: (Lv.bob || 0) + extra * .05 };
-    balls = []; ready = true; readyT = 0; clock = ROUND; score = 0; made = 0; streak = 0; fire = 0; over = false; overT = 0; floats = []; sparks = [];
+    hoop = { x: 0, y: HY, z: Lv.z, t: 0, move: Math.min(.7, Lv.move + extra * .05), bob: Math.min(.4, (Lv.bob || 0) + extra * .03) };
+    balls = []; tray = TRAY; readyT = 1; clock = ROUND; score = 0; made = 0; streak = 0; fire = 0; over = false; overT = 0; floats = []; sparks = [];
     a.score(`🏀 0 / ${need()} · Lv ${lv + 1}`); if (!keep) a.msg(`🏀 Level ${lv + 1}: score ${need()} points!`, 2200); Sound.music(MUSIC.basket);
   }
   const need = () => Lv.need + Math.max(0, lv - BB_LEVELS.length + 1) * 2;
+  const ready = () => tray > 0 && readyT > .3 && !over;
   function flickSpeed() { const L = trail[trail.length - 1]; let k = trail.length - 1; while (k > 0 && L[0] - trail[k - 1][0] <= 120) k--; const A = trail[Math.max(0, Math.min(k, trail.length - 2))], dt = Math.max(16, L[0] - A[0]); return Math.hypot(L[1] - A[1], L[2] - A[2]) / dt * 1000; }
-  // the throw: a fixed launch angle; the flick sets the speed and the left-right aim. A little help pulls a near miss toward a good shot
+  // the throw: a high fixed launch angle; the flick sets the speed and the left-right aim. A little help pulls a near miss toward a good shot
   function shoot(dx, dy, v) {
-    if (!ready || over || dy > -20) return; touched = true;
-    const th = 1.08, d = Math.hypot(hoop.z - BZ0, hoop.x) + .03, dh = hoop.y + .12 - BY0,   /* a high arc that drops in from above the rim */ ideal = Math.sqrt(GR * d * d / (2 * Math.cos(th) ** 2 * (d * Math.tan(th) - dh)));
+    if (!ready() || dy > -20) return; touched = true;
+    const th = 1.08, d = Math.hypot(hoop.z - BZ0, hoop.x) + .03, dh = hoop.y + .12 - BY0, ideal = Math.sqrt(GR * d * d / (2 * Math.cos(th) ** 2 * (d * Math.tan(th) - dh)));
     let s = 1.6 + v / 280; s = ideal + (s - ideal) * .45;
     const want = Math.atan2(hoop.x, hoop.z - BZ0); let ang = Math.atan2(dx, -dy) * .4; ang = want + (ang - want) * .4;
     const vh = s * Math.cos(th);
-    balls.push({ x: 0, y: BY0, z: BZ0, vx: Math.sin(ang) * vh, vz: Math.cos(ang) * vh, vy: s * Math.sin(th), rot: 0, t: 0, rim: false, scored: false, above: false });
-    ready = false; readyT = 0; a.fx.whoosh();
+    balls.push({ x: 0, y: BY0, z: BZ0, vx: Math.sin(ang) * vh, vz: Math.cos(ang) * vh, vy: s * Math.sin(th), rot: 0, spin: 9, t: 0, rim: false, board: false, scored: false });
+    tray--; readyT = 0; a.fx.whoosh();
   }
   function rimHits(b) {
     // the rim is a ring: find the closest point on it, and bounce off if the ball touches
@@ -6033,41 +6038,63 @@ function arcBasket(a) {
     const nx = b.x - px, ny = b.y - hoop.y, nz = b.z - pz, nd = Math.hypot(nx, ny, nz);
     if (nd < BR + .02) {
       const ux = nx / nd, uy = ny / nd, uz = nz / nd, vn = b.vx * ux + b.vy * uy + b.vz * uz;
-      if (vn < 0) { b.vx -= 1.4 * vn * ux; b.vy -= 1.4 * vn * uy; b.vz -= 1.4 * vn * uz; b.rim = true; a.fx.tick(); }
+      if (vn < 0) { b.vx -= 1.4 * vn * ux; b.vy -= 1.4 * vn * uy; b.vz -= 1.4 * vn * uz; b.rim = true; if (-vn > .6) a.fx.tick(); }
       const push = BR + .02 - nd; b.x += ux * push; b.y += uy * push; b.z += uz * push;
     }
   }
   function step(b, d) {
     const wasAbove = b.y > hoop.y;
-    b.vy -= GR * d; b.x += b.vx * d; b.y += b.vy * d; b.z += b.vz * d; b.rot += d * 9; b.t += d;
+    b.vy -= GR * d; b.x += b.vx * d; b.y += b.vy * d; b.z += b.vz * d; b.rot += d * b.spin; b.t += d;
     rimHits(b);
-    // the backboard, just behind the rim
-    const bz = hoop.z + RIM + .1;
-    if (b.vz > 0 && b.z + BR > bz && b.z < bz + .2 && Math.abs(b.x - hoop.x) < .9 && b.y > hoop.y - .25 && b.y < hoop.y + .95) { b.z = bz - BR; b.vz = -b.vz * .5; b.vx *= .8; a.fx.tick(); b.board = true; }
-    if (b.y < BR) { b.y = BR; b.vy = Math.abs(b.vy) * .55; b.vx *= .8; b.vz *= .8; }
-    // a basket: it drops down through the hoop
+    // the backboard fills the whole back of the machine; the nets on the sides and top are soft
+    const B = bz();
+    if (b.z + BR > B) { b.z = B - BR; if (b.vz > 0) { b.vz = -b.vz * .45; b.vx *= .85; b.board = true; if (b.vz < -.5) a.fx.tick(); } }
+    if (Math.abs(b.x) > SIDE - BR) { b.x = Math.sign(b.x) * (SIDE - BR); b.vx = -b.vx * .3; }
+    if (b.y > ROOF - BR) { b.y = ROOF - BR; if (b.vy > 0) b.vy = -b.vy * .25; b.vz *= .8; }
+    // the ramp: bounce a little, then roll back down toward you
+    const fy = rampY(b.z);
+    if (b.y - BR < fy) { b.y = fy + BR; if (b.vy < -1) { b.vy = -b.vy * .4; } else b.vy = 0; b.vz -= GR * .12 * d * 9; b.vx *= 1 - 2 * d; b.vz *= 1 - .4 * d; b.spin = -b.vz * 8; b.low = true; }
+    if (b.z < BZ0 + .1 && b.low && b.vz <= 0) { b.home = true; }
     if (!b.scored && wasAbove && b.y <= hoop.y && b.vy < 0 && Math.hypot(b.x - hoop.x, b.z - hoop.z) < RIM - BR * .4) basket(b);
   }
   function basket(b) {
     b.scored = true; netSw = 1; streak++; made++;
     const pts = fire > 0 ? 3 : 2; score += pts; a.score(`🏀 ${score} / ${need()} · Lv ${lv + 1}`);
     const p = P(hoop.x, hoop.y, hoop.z); floats.push({ x: p[0], y: p[1], t: 0, s: `+${pts}${b.rim || b.board ? '' : ' Swish!'}` });
-    for (let i = 0; i < 14; i++) { const an = Math.random() * 7; sparks.push({ x: p[0], y: p[1], vx: Math.cos(an) * 120, vy: Math.sin(an) * 120 - 40, t: 0, c: fire > 0 ? '#ff9f1c' : '#ffd23f' }); }
+    for (let i = 0; i < 14; i++) { const an = Math.random() * 7; sparks.push({ x: p[0], y: p[1], vx: Math.cos(an) * 110, vy: Math.sin(an) * 110 - 40, t: 0, c: fire > 0 ? '#ff9f1c' : '#ffd23f' }); }
     a.fx.win(); if (!b.rim && !b.board) a.say('ar_bb_swish', 5000);
     if (streak === 3) { fire = 8; a.say('ar_bb_hot', 0); a.msg('🔥 On fire! 3 points a basket!', 1600); }
   }
   start();
+  // ---- drawing ----
+  const quad = (pts, col) => { if (pts.some(p => !p)) return; g.fillStyle = col; g.beginPath(); pts.forEach(p => g.lineTo(p[0], p[1])); g.closePath(); g.fill(); };
+  const line = (A, B) => { if (!A || !B) return; g.beginPath(); g.moveTo(A[0], A[1]); g.lineTo(B[0], B[1]); g.stroke(); };
+  function digits(txt, x, y, size, col) { g.save(); g.shadowColor = col; g.shadowBlur = 8; g.font = `700 ${size}px "Courier New", monospace`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(255,255,255,.08)'; g.fillText('8'.repeat(txt.length), x, y); g.fillStyle = col; g.fillText(txt, x, y); g.restore(); }
+  function drawBall(b) {
+    const p = P(b.x, b.y, b.z); if (!p) return; const r = BR * p[2], sh = P(b.x, rampY(b.z), b.z);
+    if (sh) { g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(sh[0], sh[1], r * 1.05, r * .3, 0, 0, 7); g.fill(); }
+    if (fire > 0) { g.shadowColor = '#ff7a1c'; g.shadowBlur = 20; }
+    const gr = g.createRadialGradient(p[0] - r * .35, p[1] - r * .4, r * .1, p[0], p[1], r); gr.addColorStop(0, '#ffb27a'); gr.addColorStop(.6, '#f06a1e'); gr.addColorStop(1, '#b8460e'); g.fillStyle = gr; g.beginPath(); g.arc(p[0], p[1], r, 0, 7); g.fill(); g.shadowBlur = 0;
+    g.save(); g.beginPath(); g.arc(p[0], p[1], r, 0, 7); g.clip(); g.strokeStyle = 'rgba(40,20,10,.85)'; g.lineWidth = Math.max(1, r * .07); g.translate(p[0], p[1]); g.rotate(b.rot);
+    g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0); g.stroke(); g.beginPath(); g.ellipse(0, 0, r * .35, r, 0, 0, 7); g.stroke(); g.beginPath(); g.arc(-r * 1.25, 0, r * .85, -1.1, 1.1); g.stroke(); g.beginPath(); g.arc(r * 1.25, 0, r * .85, Math.PI - 1.1, Math.PI + 1.1); g.stroke(); g.restore();
+    g.fillStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.ellipse(p[0] - r * .35, p[1] - r * .45, r * .3, r * .18, -.5, 0, 7); g.fill();
+  }
   return {
     shoot,   // for testing
-    peek: () => ({ lv, score, need: need(), made, clock, over, ready, fire, streak, hoop: { ...hoop }, balls: balls.map(b => ({ x: b.x, y: b.y, z: b.z, scored: b.scored })) }),
-    down(x, y) { touched = true; if (!ready || over) return; sx = x; sy = y; trail = [[performance.now(), x, y]]; aim = null; },
+    peek: () => ({ lv, score, need: need(), made, clock, over, ready: ready(), tray, fire, streak, hoop: { ...hoop }, balls: balls.map(b => ({ x: b.x, y: b.y, z: b.z, scored: b.scored, board: b.board })) }),
+    down(x, y) { touched = true; if (!ready()) return; sx = x; sy = y; trail = [[performance.now(), x, y]]; aim = null; },
     move(x, y) { if (sx == null) return; trail.push([performance.now(), x, y]); if (trail.length > 40) trail.shift(); aim = [x - sx, y - sy]; },
     up(x, y) { if (sx == null) return; trail.push([performance.now(), x, y]); const dx = x - sx, dy = y - sy; sx = null; aim = null; shoot(dx, dy, flickSpeed()); },
     update(dt) {
+      time += dt;
       for (const f of floats) f.t += dt; floats = floats.filter(f => f.t < 1.2);
       for (const p of sparks) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 200 * dt; } sparks = sparks.filter(p => p.t < .8);
       netSw = Math.max(0, netSw - dt * 1.6); fire = Math.max(0, fire - dt); if (fire <= 0 && streak >= 3) streak = 0;
-      if (over) { overT += dt; if (overT > 4) { start(); } return; }
+      readyT += dt;
+      for (const b of balls) { for (let i = 0; i < 8; i++) step(b, dt / 8); if (!b.scored && !b.missed && b.t > .5 && b.y < hoop.y - .6 && b.vy < 0) { b.missed = true; if (streak) streak = 0; } }
+      for (const b of balls) if (b.home || b.t > 7) { b.gone = true; tray++; }   // back on your tray
+      balls = balls.filter(b => !b.gone);
+      if (over) { overT += dt; if (overT > 4) start(); return; }
       clock -= dt; if (clock <= 0) {
         clock = 0; over = true; overT = 0; const ok = score >= need();
         if (ok) { lv++; a.fx.win(); Sound.jingle(); a.say('ar_bb_level'); a.msg(`🎉 ${score} points! Next level!`, 3200); }
@@ -6075,49 +6102,49 @@ function arcBasket(a) {
         return;
       }
       hoop.t += dt; hoop.x = Math.sin(hoop.t * .9) * hoop.move; hoop.y = HY + Math.sin(hoop.t * 1.3) * hoop.bob;
-      if (!ready) { readyT += dt; if (readyT > .65) ready = true; }   // the next ball rolls up quickly, so you can keep shooting
-      for (const b of balls) { for (let i = 0; i < 6; i++) step(b, dt / 6); if (!b.scored && !b.missed && b.t > .5 && b.y < hoop.y - .6 && b.vy < 0) { b.missed = true; if (streak) streak = 0; } }
-      balls = balls.filter(b => b.t < 3.2 && b.z < 9);
     },
     draw() {
-      // the gym: a wall with bleachers and a scoreboard, and a wooden floor
-      const wall = g.createLinearGradient(0, 0, 0, H); wall.addColorStop(0, '#2a3a6a'); wall.addColorStop(1, '#3a4a7a'); g.fillStyle = wall; g.fillRect(0, 0, W, H);
-      const fy = P(0, 0, 9)[1]; g.fillStyle = '#4a3a6a'; for (let r = 0; r < 4; r++) g.fillRect(0, 70 + r * 16, W, 10);
-      for (let i = 0; i < 70; i++) { g.fillStyle = ['#ff5a4e', '#ffd23f', '#4ab3ff', '#45c46a', '#fff', '#ff9fd6'][i % 6]; const x = (i * 37) % W, r = i % 4; g.fillRect(x, 62 + r * 16, 6, 8); }
-      const fl = g.createLinearGradient(0, fy, 0, H); fl.addColorStop(0, '#d9a066'); fl.addColorStop(1, '#f2c48a'); g.fillStyle = fl; g.fillRect(0, fy, W, H - fy);
-      g.strokeStyle = 'rgba(138,90,50,.35)'; g.lineWidth = 1; for (let x = -6; x <= 6; x += .6) { const p1 = P(x, 0, 1.2), p2 = P(x, 0, 9); if (p1 && p2) { g.beginPath(); g.moveTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.stroke(); } }
-      g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 3; g.beginPath(); for (let t = -1.2; t <= 1.2; t += .05) { const p = P(Math.sin(t) * 3.4, 0, hoop.z + .1 - Math.cos(t) * 3.4); if (p) g.lineTo(p[0], p[1]); } g.stroke();
-      // the scoreboard: time left and points
-      g.fillStyle = '#1b1822'; arcRound(g, 8, 8, 92, 58, 8); g.fill(); g.strokeStyle = '#ffd23f'; g.lineWidth = 2; g.stroke();
-      arcText(g, `⏱ ${Math.ceil(clock)}`, 54, 26, 18, clock < 10 ? '#ff5a4e' : '#ffe27a'); arcText(g, `${score} / ${need()}`, 54, 50, 17, score >= need() ? '#45c46a' : '#fff');
-      // the hoop: pole, backboard, rim and net
-      const hz = hoop.z, bz = hz + RIM + .12, pb = P(hoop.x, hoop.y - 1.4, bz + .6), pt = P(hoop.x, hoop.y + .9, bz + .6);
-      g.strokeStyle = '#8a93a8'; g.lineWidth = 8; g.beginPath(); g.moveTo(pb[0], P(hoop.x, 0, bz + .6)[1]); g.lineTo(pt[0], pt[1]); g.stroke();
-      const c = (x, y) => P(hoop.x + x, hoop.y + y, bz);
-      g.fillStyle = 'rgba(255,255,255,.92)'; g.strokeStyle = '#3a3340'; g.lineWidth = 2; g.beginPath(); [c(-.9, -.25), c(.9, -.25), c(.9, .95), c(-.9, .95)].forEach(p => g.lineTo(p[0], p[1])); g.closePath(); g.fill(); g.stroke();
-      g.strokeStyle = '#ff5a4e'; g.lineWidth = 3; g.beginPath(); [c(-.3, .02), c(.3, .02), c(.3, .45), c(-.3, .45)].forEach(p => g.lineTo(p[0], p[1])); g.closePath(); g.stroke();
-      const ring = (y, r, from, to) => { const pts = []; for (let i = 0; i <= 24; i++) { const t = from + (to - from) * i / 24; pts.push(P(hoop.x + Math.cos(t) * r, y, hz + Math.sin(t) * r)); } return pts; };
+      // the arcade around the machine: dark, with neon and the glow of other games
+      const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#120c2a'); bg.addColorStop(1, '#2a1846'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+      for (let i = 0; i < 6; i++) { g.fillStyle = ['rgba(255,90,170,.18)', 'rgba(74,179,255,.16)', 'rgba(255,210,63,.14)'][i % 3]; arcRound(g, i * 84 - 20, 150 + (i % 2) * 20, 60, 220, 8); g.fill(); }
+      const B = bz(), back = z => P(0, 0, z);
+      // the ramp floor, with stripes
+      const fl = (x, z) => P(x, rampY(z), z);
+      quad([fl(-SIDE, FRONT), fl(SIDE, FRONT), fl(SIDE, B), fl(-SIDE, B)], '#1d4fa8');
+      for (let z = FRONT + .25; z < B; z += .5) quad([fl(-SIDE, z), fl(SIDE, z), fl(SIDE, Math.min(B, z + .25)), fl(-SIDE, Math.min(B, z + .25))], '#2a62c4');
+      g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 2; line(fl(-SIDE, FRONT + .1), fl(-SIDE * .2, B)); line(fl(SIDE, FRONT + .1), fl(SIDE * .2, B));
+      // the backboard wall, the marquee above it, and the hoop's bracket
+      const bw = (x, y) => P(x, y, B);
+      quad([bw(-SIDE, rampY(B)), bw(SIDE, rampY(B)), bw(SIDE, ROOF), bw(-SIDE, ROOF)], '#e8eef8');
+      g.strokeStyle = '#ff5a4e'; g.lineWidth = 3; g.beginPath(); [bw(hoop.x - .32, hoop.y + .05), bw(hoop.x + .32, hoop.y + .05), bw(hoop.x + .32, hoop.y + .5), bw(hoop.x - .32, hoop.y + .5)].forEach(p => g.lineTo(p[0], p[1])); g.closePath(); g.stroke();
+      g.strokeStyle = 'rgba(30,60,120,.25)'; g.lineWidth = 2; g.beginPath(); [bw(-SIDE + .08, rampY(B) + .08), bw(SIDE - .08, rampY(B) + .08), bw(SIDE - .08, ROOF - .08), bw(-SIDE + .08, ROOF - .08)].forEach(p => g.lineTo(p[0], p[1])); g.closePath(); g.stroke();
+      const mq = [bw(-SIDE - .1, ROOF), bw(SIDE + .1, ROOF), bw(SIDE + .1, ROOF + .55), bw(-SIDE - .1, ROOF + .55)];
+      quad(mq, '#1b1430'); g.strokeStyle = '#ff7a1c'; g.lineWidth = 3; g.beginPath(); mq.forEach(p => g.lineTo(p[0], p[1])); g.closePath(); g.stroke();
+      for (let i = 0; i < 18; i++) { const t = i / 18, p = i < 9 ? P(-SIDE - .1 + t * 2 * (SIDE + .1) * 2, ROOF + .55, B) : P(-SIDE - .1 + (t - .5) * 2 * (SIDE + .1) * 2, ROOF, B); if (!p) continue; g.fillStyle = (i + Math.floor(time * 6)) % 3 ? '#ffd23f' : '#ff5ab0'; g.beginPath(); g.arc(p[0], p[1], 2.2, 0, 7); g.fill(); }
+      { const c = P(0, ROOF + .28, B); arcText(g, 'HOOP SHOT', c[0], c[1] - 9, 13, '#ff9f1c'); digits(String(Math.ceil(clock)).padStart(2, '0'), c[0] - 46, c[1] + 7, 16, clock < 10 ? '#ff5a4e' : '#ff3b3b'); digits(String(score).padStart(2, '0'), c[0] + 46, c[1] + 7, 16, '#3bff7a'); arcText(g, `GOAL ${need()}`, c[0], c[1] + 8, 9, '#c9c9e6'); }
+      // the side nets and the roof net
+      g.strokeStyle = 'rgba(255,255,255,.22)'; g.lineWidth = 1;
+      for (const sd of [-1, 1]) { for (let z = FRONT; z <= B + .01; z += .3) line(P(sd * SIDE, rampY(z), z), P(sd * SIDE, ROOF, z)); for (let y = 1; y <= ROOF; y += .3) line(P(sd * SIDE, y, Math.max(FRONT, .9)), P(sd * SIDE, y, B)); }
+      for (let x = -SIDE; x <= SIDE + .01; x += .3) line(P(x, ROOF, 1.4), P(x, ROOF, B)); for (let z = 1.4; z <= B; z += .3) line(P(-SIDE, ROOF, z), P(SIDE, ROOF, z));
+      g.strokeStyle = '#ff7a1c'; g.lineWidth = 4; for (const sd of [-1, 1]) { line(P(sd * SIDE, rampY(FRONT), FRONT), P(sd * SIDE, rampY(B), B)); line(P(sd * SIDE, ROOF, 1.4), P(sd * SIDE, ROOF, B)); line(P(sd * SIDE, rampY(B), B), P(sd * SIDE, ROOF, B)); }
+      // the hoop: bracket, rim and net, with the balls drawn in front of or behind it as they really are
+      const hz = hoop.z;
+      g.strokeStyle = '#9aa0ab'; g.lineWidth = 3; line(P(hoop.x, hoop.y - .02, hz + RIM), P(hoop.x, hoop.y - .02, B));
+      const ring = (y, r, from, to, dxs = 0) => { const pts = []; for (let i = 0; i <= 24; i++) { const t = from + (to - from) * i / 24; pts.push(P(hoop.x + Math.cos(t) * r + dxs, y, hz + Math.sin(t) * r)); } return pts; };
       const sway = netSw * Math.sin(netSw * 30) * .05, netY = hoop.y - .42;
-      const drawRim = (from, to) => { g.strokeStyle = '#ff6a1c'; g.lineWidth = Math.max(2, P(0, 0, hz)[2] * .035); g.beginPath(); ring(hoop.y, RIM, from, to).forEach(p => g.lineTo(p[0], p[1])); g.stroke(); };
-      const drawNet = () => { g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 1.2; for (let i = 0; i < 12; i++) { const t = i / 12 * Math.PI * 2, p1 = P(hoop.x + Math.cos(t) * RIM, hoop.y, hz + Math.sin(t) * RIM), p2 = P(hoop.x + Math.cos(t + .4) * RIM * .6 + sway, netY - netSw * .1, hz + Math.sin(t + .4) * RIM * .6); g.beginPath(); g.moveTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.stroke(); } g.beginPath(); ring(netY + .2, RIM * .8, 0, Math.PI * 2).forEach(p => g.lineTo(p[0] + sway * 20, p[1])); g.stroke(); };
-      // the balls, far ones first; a ball behind the rim goes under the front of the rim and net
-      const drawBall = b => {
-        const sh = P(b.x, 0, b.z), p = P(b.x, b.y, b.z); if (!p) return; const r = BR * p[2];
-        if (sh) { g.fillStyle = 'rgba(0,0,0,.2)'; g.beginPath(); g.ellipse(sh[0], sh[1], r, r * .3, 0, 0, 7); g.fill(); }
-        if (fire > 0) { g.shadowColor = '#ff7a1c'; g.shadowBlur = 18; }
-        const gr = g.createRadialGradient(p[0] - r * .35, p[1] - r * .35, r * .1, p[0], p[1], r); gr.addColorStop(0, '#ffb070'); gr.addColorStop(1, '#e8651c'); g.fillStyle = gr; g.beginPath(); g.arc(p[0], p[1], r, 0, 7); g.fill(); g.shadowBlur = 0;
-        g.save(); g.beginPath(); g.arc(p[0], p[1], r, 0, 7); g.clip(); g.strokeStyle = '#3a2214'; g.lineWidth = Math.max(1, r * .08); g.translate(p[0], p[1]); g.rotate(b.rot);
-        g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0); g.moveTo(0, -r); g.lineTo(0, r); g.stroke(); g.beginPath(); g.arc(-r * 1.3, 0, r * .9, -1, 1); g.stroke(); g.beginPath(); g.arc(r * 1.3, 0, r * .9, Math.PI - 1, Math.PI + 1); g.stroke(); g.restore();
-      };
-      const back = balls.filter(b => b.z > hz).sort((p, q) => q.z - p.z), front = balls.filter(b => b.z <= hz).sort((p, q) => q.z - p.z);
-      drawRim(0, Math.PI); back.forEach(drawBall); drawNet(); drawRim(Math.PI, Math.PI * 2); front.forEach(drawBall);
-      if (ready && !over) drawBall({ x: 0, y: BY0, z: BZ0, rot: 0 });
-      // aiming while you swipe: which way, and how hard
+      const drawRim = (from, to) => { g.strokeStyle = '#ff5a1c'; g.lineWidth = Math.max(2, P(0, 0, hz)[2] * .04); g.beginPath(); ring(hoop.y, RIM, from, to).forEach(p => g.lineTo(p[0], p[1])); g.stroke(); };
+      const drawNet = () => { g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 1.2; for (let i = 0; i < 14; i++) { const t = i / 14 * Math.PI * 2, p1 = P(hoop.x + Math.cos(t) * RIM, hoop.y, hz + Math.sin(t) * RIM), p2 = P(hoop.x + Math.cos(t + .45) * RIM * .6 + sway, netY - netSw * .1, hz + Math.sin(t + .45) * RIM * .6); line(p1, p2); const p3 = P(hoop.x + Math.cos(t - .45) * RIM * .6 + sway, netY - netSw * .1, hz + Math.sin(t - .45) * RIM * .6); line(p1, p3); } g.beginPath(); ring(netY + .2, RIM * .8, 0, Math.PI * 2, sway).forEach(p => g.lineTo(p[0], p[1])); g.stroke(); };
+      const sorted = balls.slice().sort((p, q) => q.z - p.z), behind = sorted.filter(b => b.z > hz), front = sorted.filter(b => b.z <= hz);
+      drawRim(0, Math.PI); behind.forEach(drawBall); drawNet(); drawRim(Math.PI, Math.PI * 2); front.forEach(drawBall);
+      // your tray at the front, with the balls waiting, and the one in your hand
+      quad([P(-SIDE, .75, .95), P(SIDE, .75, .95), P(SIDE, .9, FRONT + .05), P(-SIDE, .9, FRONT + .05)], '#ff7a1c');
+      for (let i = 0; i < tray - (ready() ? 1 : 0) && i < 4; i++) drawBall({ x: (i % 2 ? 1 : -1) * (.62 + Math.floor(i / 2) * .27), y: .98 + BR, z: 1.55, rot: i });
+      if (ready()) drawBall({ x: 0, y: BY0, z: BZ0, rot: 0 });
       if (aim && aim[1] < -10) { const p = P(0, BY0, BZ0); g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 3; g.setLineDash([6, 7]); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(p[0] + aim[0] * 1.5, p[1] + aim[1] * 1.5); g.stroke(); g.setLineDash([]); }
       for (const p of sparks) { g.globalAlpha = 1 - p.t / .8; g.fillStyle = p.c; g.beginPath(); g.arc(p.x, p.y, 3, 0, 7); g.fill(); } g.globalAlpha = 1;
       for (const f of floats) { g.globalAlpha = 1 - f.t / 1.2; arcText(g, f.s, f.x, f.y - 30 - f.t * 40, 22, '#ffe27a'); } g.globalAlpha = 1;
-      if (fire > 0) arcText(g, '🔥 On fire!', 54, 84, 15, '#ff9f1c');
-      if (!touched) { arcText(g, '👆 Flick the ball at the hoop!', W / 2, H - 120, 20, '#fff'); arcText(g, 'Faster flick = farther throw', W / 2, H - 96, 15, '#ffe27a'); }
+      if (fire > 0) arcText(g, '🔥 On fire!', W / 2, H - 14, 16, '#ff9f1c');
+      if (!touched) { arcText(g, '👆 Flick the ball at the hoop!', W / 2, H - 110, 20, '#fff'); arcText(g, 'Faster flick = farther throw', W / 2, H - 86, 15, '#ffe27a'); }
     },
   };
 }
