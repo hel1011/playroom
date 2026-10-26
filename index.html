@@ -625,7 +625,9 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 @media (max-height: 520px) { .arc-top { padding: 4px 8px 2px 12px; font-size: 17px; } .arc-x { width: 40px; height: 40px; } }
 .arc-top b, .arc-score { white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .arc-top b { flex: 0 1 auto; } .arc-score { flex: 0 1 auto; }
-.arc-x, .arc-mus { flex: 0 0 auto; }   /* the buttons never get squeezed off the edge on a narrow phone */
+.arc-x, .arc-mus, .arc-re { flex: 0 0 auto; }
+.arc-re { border: 0; width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,.14); color: #fff; font: 800 22px/1 var(--f-display); cursor: pointer; margin-right: 8px; }
+.arc-re.ask { background: #ffd23f; color: #3a3340; }   /* the buttons never get squeezed off the edge on a narrow phone */
 @media (max-width: 440px) { .arc-top { font-size: 16px; gap: 8px; padding-left: 12px; } .arc-score { font-size: 15px; padding: 6px 10px; } }
 .sci-fossil .sci-svg, .sci-bees .sci-svg { touch-action: none; }
 .fs-gone { transition: opacity .25s, transform .25s; opacity: 0; transform-box: fill-box; transform-origin: center; transform: scale(.4); }
@@ -5138,19 +5140,19 @@ const MUSIC = {
   ],
 };
 const ARC_GAMES = {
-  lunar: { title: 'Moon Landing', icon: '🚀', how: 'ar_lunar_how', make: arcLunar },
+  lunar: { title: 'Moon Landing', icon: '🚀', how: 'ar_lunar_how', make: arcLunar, save: true },
   race: { title: 'Turbo Race', icon: '🏎️', how: 'ar_race_how', make: arcRace, music: true },
   kick: { title: 'Free Kick', icon: '⚽', how: 'ar_kick_how', make: arcKick },
-  bricks: { title: 'Brick Breaker', icon: '🧱', how: 'ar_bricks_how', make: arcBricks },
+  bricks: { title: 'Brick Breaker', icon: '🧱', how: 'ar_bricks_how', make: arcBricks, save: true },
   skee: { title: 'Skee-Ball', icon: SKEE_ICON, how: 'ar_skee_how', make: arcSkee },
   pong: { title: 'Table Tennis', icon: '🏓', how: 'ar_pong_how', make: arcPong },
-  unicorn: { title: 'Unicorn Ride', icon: '🦄', how: 'uni_intro', make: arcUnicorn, music: true },
+  unicorn: { title: 'Unicorn Ride', icon: '🦄', how: 'uni_intro', make: arcUnicorn, music: true, save: true },
   basket: { title: 'Hoop Shot', icon: '🏀', how: 'ar_bb_how', make: arcBasket, music: true },
 };
 function openArcade(kind, host, onClose) {
   const G = ARC_GAMES[kind]; Sound.stopVoice();
   const wrap = document.createElement('div'); wrap.className = 'arc arc-' + kind;
-  wrap.innerHTML = `<div class="arc-top"><b>${G.icon} ${G.title}</b><span class="arc-score"></span>${G.music ? `<button type="button" class="arc-mus" aria-label="Music" aria-pressed="${Sound.musicOn}">🎵</button>` : ''}<button type="button" class="arc-x" aria-label="Back to the treehouse">✕</button></div>
+  wrap.innerHTML = `<div class="arc-top"><b>${G.icon} ${G.title}</b><span class="arc-score"></span>${G.save ? `<button type="button" class="arc-re" aria-label="Start over">↺</button>` : ''}${G.music ? `<button type="button" class="arc-mus" aria-label="Music" aria-pressed="${Sound.musicOn}">🎵</button>` : ''}<button type="button" class="arc-x" aria-label="Back to the treehouse">✕</button></div>
     <div class="arc-stage"><canvas class="arc-cv"></canvas><div class="arc-msg" hidden></div></div>`;
   host.appendChild(wrap);
   const cv = wrap.querySelector('canvas'), g = cv.getContext('2d'), stage = wrap.querySelector('.arc-stage'), msgEl = wrap.querySelector('.arc-msg'), scoreEl = wrap.querySelector('.arc-score');
@@ -5161,6 +5163,8 @@ function openArcade(kind, host, onClose) {
     const s = Math.min(r.width / W, r.height / H), dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.style.width = W * s + 'px'; cv.style.height = H * s + 'px'; cv.width = Math.round(W * s * dpr); cv.height = Math.round(H * s * dpr);
     g.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+    // messages sit over the game picture itself (on an upright phone the picture is a band in the middle of a tall stage)
+    msgEl.style.top = ((stage.clientHeight - 8 - H * s) / 2 + H * s * .3) + 'px'; msgEl.style.maxWidth = Math.max(160, W * s - 24) + 'px';
   }
   const ro = new ResizeObserver(fit); ro.observe(stage); fit();
   const api = {
@@ -5170,8 +5174,11 @@ function openArcade(kind, host, onClose) {
     msg(t, ms = 1800) { msgEl.textContent = t; msgEl.hidden = false; msgEl.classList.remove('bump'); void msgEl.offsetWidth; msgEl.classList.add('bump'); clearTimeout(msgT); msgT = setTimeout(() => { msgEl.hidden = true; }, ms); },
     say(id, gap = 0) { const now = performance.now(); if (now - said < gap) return; said = now; Sound.say(id); },
     fx: Sound.fx,
+    // where you got to, kept per player, so closing the game and coming back picks up from there
+    load() { return G.save ? store.get('pr-arc-' + kind, null) : null; },
+    save(v) { if (G.save) store.set('pr-arc-' + kind, v); },
   };
-  const game = G.make(api);
+  let game = G.make(api);
   if (window.__arcTest) window.__arcTest(game);   // for testing
   const toL = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; };
   cv.addEventListener('pointerdown', e => { e.preventDefault(); Sound.unlock(); try { cv.setPointerCapture(e.pointerId); } catch (err) {} game.down && game.down(...toL(e), e.pointerId); });
@@ -5191,6 +5198,14 @@ function openArcade(kind, host, onClose) {
   const mus = wrap.querySelector('.arc-mus');
   if (mus) mus.addEventListener('click', () => { Sound.musicOn = !Sound.musicOn; mus.setAttribute('aria-pressed', String(Sound.musicOn)); Sound.fx.tap(); });
   wrap.querySelector('.arc-x').addEventListener('click', () => { Sound.fx.tap(); close(); });
+  // start over: the first tap asks, a second tap within 3 seconds really starts again from level 1
+  const re = wrap.querySelector('.arc-re'); let reT = 0;
+  if (re) re.addEventListener('click', () => {
+    Sound.fx.tap(); const now = performance.now();
+    if (now - reT > 3000) { reT = now; re.classList.add('ask'); api.msg('↺ Tap again to start over from level 1', 2800); setTimeout(() => re.classList.remove('ask'), 3000); return; }
+    reT = 0; re.classList.remove('ask'); Sound.stopVoice(); Sound.fx.thrust(false, true); api.save(null);
+    game = G.make(api); if (window.__arcTest) window.__arcTest(game); api.msg('↺ Starting over!', 1600);
+  });
   Sound.say(G.how);
   return close;
 }
@@ -5269,17 +5284,19 @@ function arcLunar(a) {
     if (L.meteors) for (let i = 0; i < L.meteors + round; i++) obs.push({ k: 'meteor', x: Math.random() * W, y: -40 - i * 140, r: 10, vx: (Math.random() < .5 ? -1 : 1) * (20 + Math.random() * 25), vy: 75 + round * 12 + Math.random() * 20 });
     if (L.lasers) [130, 232].slice(0, L.lasers).forEach((y, i) => obs.push({ k: 'laser', x: 0, y, w: W, h: 6, ph: 1.4 + i * 2.4, on: false }));   // blink on and off: wait, then zip through
     if (L.ghosts) for (let i = 0; i < L.ghosts + round; i++) obs.push({ k: 'ghost', cx: i % 2 ? W - 130 : 130, cy: 150 + (i % 3) * 45, x: 0, y: 0, r: 14, ph: i * 2.4, show: true });
+    a.save({ level, landed });
     if (fresh) { introT = 2.2; a.msg(`${L.icon} Level ${level % LUNAR_LEVELS.length + 1}: ${L.name}${round ? ` · Speed ${round + 1}` : ''}`, 2000); }
   }
   function ceilAt(x) { if (!ceil) return -99; const i = Math.max(0, Math.min(ceil.length - 2, Math.floor(x / 20))); const [x0, y0] = ceil[i], [x1, y1] = ceil[i + 1]; return y0 + (y1 - y0) * ((x - x0) / (x1 - x0)); }
   function groundAtX(x) { const i = Math.max(0, Math.min(ground.length - 2, Math.floor(x / 20))); const [x0, y0] = ground[i], [x1, y1] = ground[i + 1]; return y0 + (y1 - y0) * ((x - x0) / (x1 - x0)); }
+  { const sv = a.load(); if (sv && sv.level > 0) { level = sv.level; landed = sv.landed || 0; } }   // pick up where you left off
   reset(true); a.score(`🌙 ${landed}`);
   const SAFE = 58;   // landing slower than this is soft
   function crash(why) { s.over = true; s.win = false; s.t = 0; s.why = why; a.fx.pop(); a.fx.rumble(.6);
     engine = false; a.fx.thrust(false);
     if (why === 'zap') { a.say('ar_bump'); a.msg('Zap! Wait for the laser to blink off! 🚨'); }
     else if (why === 'bonk') { a.say('ar_bump'); a.msg('Bonk! Steer around it! ☄️'); } else { a.say(why === 'fast' ? 'ar_crash' : 'ar_offpad'); a.msg(why === 'fast' ? 'Too fast! 💥' : 'Land on the yellow pad!'); } }
-  function land() { const soft = s.vy < SAFE; if (!soft) return crash('fast'); engine = false; a.fx.thrust(false); s.over = true; s.win = true; s.t = 0; landed++; level++; a.score(`🌙 ${landed}`); a.fx.win(); champNext = level % LUNAR_LEVELS.length === 0; if (!champNext) { a.say('ar_land'); a.msg('Perfect landing! 🎉'); } }
+  function land() { const soft = s.vy < SAFE; if (!soft) return crash('fast'); engine = false; a.fx.thrust(false); s.over = true; s.win = true; s.t = 0; landed++; level++; a.save({ level, landed }); a.score(`🌙 ${landed}`); a.fx.win(); champNext = level % LUNAR_LEVELS.length === 0; if (!champNext) { a.say('ar_land'); a.msg('Perfect landing! 🎉'); } }
   return {
     setLevel: n => { level = n; champT = 0; reset(true); }, landNow: () => { s.vy = 10; land(); },   // for testing
     peek: () => ({ ...s, landed, level, champ: champT > 0, name: L.name, padVX: pad.vx, padX: pad.x, padY: pad.y, padW: pad.w, obs: obs.map(o => ({ ...o })) }),
@@ -5893,7 +5910,7 @@ function arcBricks(a) {
   };
   let level = 0, bricks, pad = { x: W / 2, w: 104, tw: 104, tx: W / 2 }, balls, stuck = true, broke = 0, clearT = -1, touched = false, missT = 0;
   let caps = [], on = {}, boost = 0, sparks = [];
-  const show = () => a.score(`🧱 ${broke} · Lv ${level + 1}`);
+  const show = () => { a.score(`🧱 ${broke} · Lv ${level + 1}`); a.save({ level, broke, bricks: bricks.length ? bricks : null }); };
   function build() {
     const p = PAT[level % PAT.length]; bricks = [];
     p.forEach((row, r) => [...row].forEach((c, k) => {
@@ -5914,7 +5931,8 @@ function arcBricks(a) {
     } else on[kind] = P.t;
     if (kind === 'slow') balls.forEach(resize);
   }
-  build(); newBall(); show();
+  { const sv = a.load(); if (sv) { level = sv.level || 0; broke = sv.broke || 0; } build(); if (sv && sv.bricks && sv.bricks.length) bricks = sv.bricks; }   // pick up where you left off
+  newBall(); show();
   return {
     peek: () => ({ bx: balls[0] ? balls[0].x : pad.x, by: balls[0] ? balls[0].y : PY, balls: balls.map(b => [b.x, b.y]), px: pad.x, pw: pad.w, left: bricks.length, stuck, broke, level, caps: caps.map(c => [c.x, c.y, c.k]), on: { ...on }, spd: Math.round(speed()) }),
     test: k => power(k),
@@ -5965,7 +5983,7 @@ function arcBricks(a) {
         balls = balls.filter(b => !b.gone);
         if (!balls.length) { newBall(); a.fx.wrong(); missT -= 1; if (missT <= 0) { missT = 3; a.say('ar_oops'); } }
       }
-      if (!bricks.length) { clearT = 0; caps = []; a.fx.win(); a.say('ar_clear'); a.msg(`Level ${level + 1} cleared! 🎉`, 2000); }
+      if (!bricks.length) { a.save({ level: level + 1, broke, bricks: null }); clearT = 0; caps = []; a.fx.win(); a.say('ar_clear'); a.msg(`Level ${level + 1} cleared! 🎉`, 2000); }
     },
     draw() {
       const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#1d2a5a'); bg.addColorStop(1, '#2d1d5a'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
@@ -9327,6 +9345,7 @@ function arcUnicorn(a) {
     scen = [];
     for (let i = 2; i < N; i++) for (const s of [-1, 1]) if (Math.random() < .3) scen.push({ w: i * SEG + Math.random() * SEG, x: s * (RHW + 1.6 + Math.random() * 8), k: pick(Lnd.side) });
     objs = []; pos = 0; speed = 0; x = 0; wantX = 0; frozen = 0; gems = 0; hearts = 3; combo = 0; comboT = 0; power = 0; boostT = 0; hurtT = 0; done = false; doneT = 0; bgX = 0; time = 0; shots = []; sparks = []; floats = []; boss = null;
+    a.save({ land });
     gates = level === 'easy' ? 4 : 5; nextGate = 150; nextFoe = 40; a.score(`❄️ ${land % UNI_LANDS.length + 1}. ${Lnd.name}`); a.msg(`${lp ? '🔥 ' : '🦄 '}Level ${land % UNI_LANDS.length + 1}: ${Lnd.name}${lp ? ` · Speed ${lp + 1}` : ''}`, 2000); Sound.music(MUSIC.uni[land % MUSIC.uni.length]);
   }
   function say(id, force) { const n = performance.now(); if (!force && n - said < 2200) return; said = n; Sound.say(id); }
@@ -9407,7 +9426,7 @@ function arcUnicorn(a) {
     }
     for (const c of conf) { c.t += dt; c.y += c.vy * dt; c.x += c.vx * dt; c.r += dt * 4; } conf = conf.filter(c => c.y < H + 10);
     if (champT > 0) { champT -= dt; if (champT <= 0) ride(); }
-    else if (done) { doneT += dt; if (doneT > 7) { land++; if (land % UNI_LANDS.length === 0) { champT = 7; Sound.jingle(); say('uni_champ', true); for (let i = 0; i < 80; i++) conf.push({ x: Math.random() * W, y: -10 - Math.random() * 120, vx: (Math.random() - .5) * 60, vy: 60 + Math.random() * 90, c: ['#ff7ab8', '#ffd23f', '#9fd8ff', '#c9a8ff', '#fff'][i % 5], r: Math.random() * 6, t: 0 }); } else ride(); } }
+    else if (done) { doneT += dt; wantX = 0; if (doneT > 7) { land++; a.save({ land }); if (land % UNI_LANDS.length === 0) { champT = 7; Sound.jingle(); say('uni_champ', true); for (let i = 0; i < 80; i++) conf.push({ x: Math.random() * W, y: -10 - Math.random() * 120, vx: (Math.random() - .5) * 60, vy: 60 + Math.random() * 90, c: ['#ff7ab8', '#ffd23f', '#9fd8ff', '#c9a8ff', '#fff'][i % 5], r: Math.random() * 6, t: 0 }); } else ride(); } }
   }
   // ---- drawing ----
   function sprite(o, sx, y, s) {
@@ -9629,7 +9648,16 @@ function arcUnicorn(a) {
       for (const c of conf) { g.save(); g.translate(c.x, c.y); g.rotate(c.r); g.fillStyle = c.c; g.fillRect(-4, -2.5, 8, 5); g.restore(); }
       arcEmoji(g, '👑', W / 2, 100, 60); arcText(g, 'Ice Princess Champion!', W / 2, 168, 28, '#6a3a8a'); arcText(g, 'You saved every part of Princess Land!', W / 2, 202, 17, '#6a3a8a');
       if (champT < 4.5) arcText(g, `🔥 Next: all ten again, faster!`, W / 2, 240, 16, '#ff5a7a');
-    } else if (done) { g.fillStyle = 'rgba(255,255,255,.92)'; arcRound(g, W / 2 - 160, 110, 320, 84, 22); g.fill(); arcText(g, '❄️ Princess Land is safe! ❄️', W / 2, 136, 20, '#6a3a8a'); arcText(g, `Froze ${frozen} troublemakers · 💎 ${gems} gates`, W / 2, 166, 15, '#6a3a8a'); }
+    } else if (done) {
+      const k = Math.min(1, doneT / .45), cw = 340, ch = 156, cx = W / 2, cy = H / 2 - 6, nx = (land + 1) % UNI_LANDS.length;
+      g.fillStyle = `rgba(60,30,100,${.38 * k})`; g.fillRect(0, 0, W, H);
+      g.save(); g.translate(cx, cy); const sc = .8 + .2 * (1 - (1 - k) ** 3); g.scale(sc, sc);
+      g.fillStyle = 'rgba(255,255,255,.96)'; arcRound(g, -cw / 2, -ch / 2, cw, ch, 26); g.fill(); g.strokeStyle = '#c9a8ff'; g.lineWidth = 4; g.stroke();
+      arcEmoji(g, '❄️', 0, -ch / 2 + 34, 34); arcText(g, `${Lnd.name} is safe!`, 0, -6, 24, '#6a3a8a');
+      arcText(g, `Froze ${frozen} troublemakers · 💎 ${gems} gates`, 0, 26, 15, '#8a5aa8');
+      if (doneT > 2.5) arcText(g, nx ? `Next: ${UNI_LANDS[nx].name} ➜` : 'Next: the big finale! 👑', 0, 54, 15, '#ff5a7a');
+      g.restore();
+    }
   }
   const game = { peek: () => ({ pos, x, speed, frozen, gems, hearts, done, power, land, champ: champT > 0, boss: boss && { ice: boss.ice, need: boss.need, frozen: boss.frozen, sx: boss.sx, sy: boss.sy, kind: boss.kind }, land: Lnd.name,
       objs: objs.map(o => ({ k: o.k, x: o.x, dz: o.w - pos, frozen: o.frozen, sx: o.sx, sy: o.sy, hp: o.hp, doors: o.doors && o.doors.map(d => ({ lane: d.lane, ok: d.ok, n: d.n ?? d.dots, pic: d.pic })), sign: o.sign, passed: o.passed })) }),
@@ -9640,6 +9668,7 @@ function arcUnicorn(a) {
     up(px, py, id) { if (!drag || drag.id !== id) return; if (!drag.moved && performance.now() - drag.t < 450 && !done) shoot(px, py); drag = null; },
     update, draw,
   };
+  { const sv = a.load(); if (sv && sv.land > 0) land = sv.land; }   // pick up where you left off
   ride();
   return game;
 }
