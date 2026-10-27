@@ -833,6 +833,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .bookcard { border: 0; background: var(--card); border-radius: 22px; padding: 10px 10px 14px; box-shadow: 0 6px 0 var(--edge); cursor: pointer; display: flex; flex-direction: column; gap: 10px; transition: transform .15s; }
 .bookcard:hover { transform: translateY(-3px) rotate(-1deg); }
 .bookcard .sart { aspect-ratio: 4 / 3; border-radius: 16px; }
+.bookcard .actor { animation: none !important; }   /* still pictures on the shelf: 14 covers of moving pictures kept dozens of extra layers in the phone's graphics memory */
 .btitle { font: 800 20px/1.15 var(--f-display); text-align: center; text-wrap: balance; }
 .titlepage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
 .titlepage .sart { width: min(560px, 90%); aspect-ratio: 4 / 3; border-radius: 22px; box-shadow: 0 6px 0 var(--edge); }
@@ -1676,8 +1677,10 @@ const Sound = (() => {
     const my = token; busyTok = my;
     await sayRun(ids, opts, my);
     if (busyTok === my) busyTok = null;
-    // cut off by a newer line: let that line finish first, then carry on (so the game still moves forward)
-    if (my !== token) while (busyTok !== null && busyTok === token) await wait(120);
+    // cut off by a newer line: let that line finish first, then carry on (so the game still moves forward).
+    // Only wait for that one line: if anything newer starts or stops it, stop waiting. (Waiting for "whatever is
+    // talking now" kept these little waits alive forever while a story was read aloud, piling up page after page.)
+    if (my !== token) { const next = token; while (busyTok !== null && busyTok === next && token === next) await wait(120); }
   }
   async function sayRun(ids, opts, my) {
     for (const id of ids) {
@@ -3357,7 +3360,7 @@ function storyGame(root, api) {
     introIds = ['bk_pick']; if (talk) Sound.say('bk_pick');
   }
   async function open(b) {
-    subLabel = b.title; api.round(3);
+    subLabel = b.title; api.round(4);
     book = b; pi = -1; shelfBtn.hidden = false; rtm.hidden = false; wrongOnce = false;
     Sound.preload([b.id + '_title']);
     box.innerHTML = `<div class="titlepage">${art(b.cover)}<h2>${b.title}</h2><button class="big-btn" type="button">Start reading ▶</button></div>`;
