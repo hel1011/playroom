@@ -10163,7 +10163,7 @@ function moonGame(root, api) {
     if (scene === 'home') return ['TO EARTH', `${Math.max(0, Math.round((1 - earthSize) * 240))},000 mi`, '#7fd0ff'];
     if (scene === 'reentry') return ['HEAT SHIELD', 'ON', '#ffb35a'];
     if (scene === 'chutes') return ['ALTITUDE', sea.splash ? 'SPLASH!' : `${Math.round(sea.alt * 10000).toLocaleString()} ft`, '#7fe39a'];
-    if (scene === 'land') { const v = Math.round(land.vy); return [`HEIGHT ${Math.round(land.h)} m`, `SPEED ${v}`, v > 8 ? '#ff7a6b' : '#7fe39a']; }
+    if (scene === 'land') { const v = Math.round(land.vy); return [`HEIGHT ${Math.round(land.h)} m`, `SPEED ${v}`, v > 15 ? '#ff7a6b' : '#7fe39a']; }
     return ['', '', '#fff'];
   }
   // ---- your helmet: the visor edge, a soft reflection, and the mission step at the top ----
@@ -10239,9 +10239,9 @@ function moonGame(root, api) {
     if (scene === 'orbit') { orbitT += dt; if (tli > 0) { if (firing) vel = Math.min(.16, vel + dt * .12); else vel = Math.max(0, vel - dt * .05); tli = Math.min(1, tli + vel * dt); if (firing) { fuel = Math.max(.4, fuel - dt * .03); shake = Math.max(shake, .25); } } }
     if (scene === 'cruise' && !done) {}
     if (scene === 'land' && land && !land.down) {
-      land.vy += 7.5 * (crashes >= 2 ? .7 : 1) * dt; if (holding) { land.vy = Math.max(2.5, land.vy - 19 * dt); fuel = Math.max(.08, fuel - dt * .01); shake = Math.max(shake, .2); }   // the engine slows you to a gentle drift down (never back up)
-      land.vy = Math.max(-6, Math.min(40, land.vy)); land.h -= land.vy * dt;
-      if (land.h <= 0) { land.h = 0; land.down = land.vy < (crashes >= 2 ? 12 : 9) ? 'soft' : 'hard'; for (let i = 0; i < 24; i++) land.dust.push({ x: W / 2 + (Math.random() - .5) * 120, y: winB() * .8, vx: (Math.random() - .5) * 200, vy: -Math.random() * 60, r: 6 + Math.random() * 10, t: 0 }); }
+      land.vy += 4.5 * dt; if (holding) { const target = Math.max(3, Math.min(9, land.h * .15)); land.vy += (target - land.vy) * Math.min(1, dt * 3); fuel = Math.max(.08, fuel - dt * .01); shake = Math.max(shake, .2); }   // the engine slows you to a gentle drift down (never back up)
+      land.vy = Math.max(-6, Math.min(crashes ? 14 : 20, land.vy)); land.h -= land.vy * dt;   /* never falls faster than this (after one bump, never too fast to land) */
+      if (land.h <= 0) { land.h = 0; land.down = land.vy <= (crashes ? 14 : 16) ? 'soft' : 'hard'; for (let i = 0; i < 24; i++) land.dust.push({ x: W / 2 + (Math.random() - .5) * 120, y: winB() * .8, vx: (Math.random() - .5) * 200, vy: -Math.random() * 60, r: 6 + Math.random() * 10, t: 0 }); }
     }
     if (land) for (const d of land.dust) { d.t += dt * .5; d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 30 * dt; }
     if (walk) {
@@ -10344,7 +10344,7 @@ function moonGame(root, api) {
     // 8. landing: hold to slow down, touch down softly on the flat spot
     step = 7; for (let i = 0; i < 15; i++) { fade = i / 15; await sleep(25); } scene = 'land';
     // craters at every size, so there's always something to see coming closer (and none on the landing spot)
-    const freshLand = () => ({ h: 160, vy: 6, fwd: 0, down: null, dust: [], craters: [...[...Array(30)].map(() => ({ x: (Math.random() - .5) * 260, y: (Math.random() - .5) * 200, r: 3 + Math.random() * 9 })), ...[...Array(30)].map(() => ({ x: (Math.random() - .5) * 40, y: (Math.random() - .5) * 30, r: .5 + Math.random() * 1.6 }))].filter(c => Math.hypot(c.x, c.y) > c.r + 11) });
+    const freshLand = () => ({ h: 120, vy: 4, fwd: 0, down: null, dust: [], craters: [...[...Array(30)].map(() => ({ x: (Math.random() - .5) * 260, y: (Math.random() - .5) * 200, r: 3 + Math.random() * 9 })), ...[...Array(30)].map(() => ({ x: (Math.random() - .5) * 40, y: (Math.random() - .5) * 30, r: .5 + Math.random() * 1.6 }))].filter(c => Math.hypot(c.x, c.y) > c.r + 11) });
     land = freshLand(); fuel = .7; for (let i = 0; i < 15; i++) { fade = 1 - i / 15; await sleep(25); } fade = 0;
     btn = { ic: '🔥', label: 'HOLD', col: '#ff9f1c', hold: true }; say('moon_land');
     for (;;) {
