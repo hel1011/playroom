@@ -48,6 +48,9 @@ html, body { height: 100%; height: var(--app-h, 100%); overscroll-behavior: none
 body {
   margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.4;
   padding-inline: 16px; padding-block: 12px; -webkit-tap-highlight-color: transparent; overflow: hidden;
+  /* keep clear of the iPhone's notch, status bar and home bar (the app is drawn edge to edge on the home screen and in the store app) */
+  padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: max(12px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));
 }
 button { font-family: inherit; color: inherit; }
 button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
@@ -242,7 +245,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
   flex: 1 1 auto; min-height: 0; overflow-y: auto; display: grid; gap: 14px; padding: 4px 2px 8px;
   grid-template-columns: repeat(4, 1fr); align-content: start; width: 100%; max-width: 1100px; margin-inline: auto;
 }
-.tiles { padding-top: 16px; }
+.tiles { padding-top: 16px; padding-bottom: 28px; scroll-padding-bottom: 28px; }   /* room under the last row, so its bottom edge and shadow never sit cut off at the end of the scroll */
 .tile {
   border: 0; border-radius: 26px; background: var(--card); cursor: pointer; padding: 14px 10px 14px;
   display: flex; flex-direction: column; align-items: center; gap: 10px; box-shadow: 0 5px 0 var(--edge);
@@ -1396,7 +1399,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 
 @media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, 1fr); } .tile .art { aspect-ratio: 1.6; } .tile:last-child:nth-child(odd) { grid-column: span 2; } .tile:last-child:nth-child(odd) .art { aspect-ratio: 3.4; } }
 @media (max-width: 620px) {
-  body { padding-block: 8px; }
+  body { padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
   .logo { font-size: 20px; }
   .gamebar .bubble { order: 5; flex-basis: 100%; font-size: 14px; }
   .gamebar .bubble::before { display: none; }
@@ -9724,23 +9727,39 @@ function moonGame(root, api) {
   const cv = document.createElement('canvas'); cv.className = 'moon-cv'; wrap.appendChild(cv);
   const g = cv.getContext('2d');
   let W = 400, H = 600, alive = true, raf = 0, last = 0, t = 0, tok = 0;
+  let fits = 0;
   function fit() {
-    const r = wrap.getBoundingClientRect(); if (r.width < 10 || r.height < 10) return;
+    const r = wrap.getBoundingClientRect(); if (r.width < 10 || r.height < 10) return; fits++;
     const ar = r.width / r.height;   // upright phones: 400 wide and as tall as needed; sideways: 360 tall and as wide as needed
     if (ar < 1) { W = 400; H = Math.round(Math.min(900, 400 / ar)); } else { H = 360; W = Math.round(Math.min(1100, 360 * ar)); }
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); g.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
   }
-  const ro = new ResizeObserver(fit); ro.observe(wrap); fit();
+  let lastSize = '';
+  // Refit only when the game area really changes size, and redraw in the same moment (a resized canvas is blank until
+  // it's drawn again, which flashed on phones). Pip's caption box is held at the height of his longest line, so the
+  // game area doesn't grow and shrink every time he says something new.
+  const bub = document.querySelector('#game .gamebar .caption');
+  const LONGEST = Object.keys(TEXT).filter(k => k.startsWith('moon_')).map(k => TEXT[k]).sort((a, b) => b.length - a.length)[0] || '';
+  function reserve() {
+    if (!bub) return; const keep = bub.textContent; bub.style.minHeight = ''; bub.textContent = LONGEST;
+    const h = bub.getBoundingClientRect().height; bub.textContent = keep; if (h > 0) bub.style.minHeight = Math.ceil(h) + 'px';
+  }
+  reserve();
+  const refit = () => { const r = wrap.getBoundingClientRect(), key = Math.round(r.width) + 'x' + Math.round(r.height); if (key === lastSize) return; lastSize = key; fit(); if (typeof draw === 'function' && alive) { g.save(); draw(); g.restore(); } };
+  const ro = new ResizeObserver(refit); ro.observe(wrap); fit();
+  const onWin = () => { reserve(); }; addEventListener('resize', onWin);
   // ---- the mission's state ----
-  let want = '', step = 0, scene = 'suit', helmet = 0, helmetT = -1, sw = [false, false, false], count = 11, alt = 0, holding = false, fuel = 1, shake = 0,
+  let want = '', vel = 0, glow = 0, step = 0, scene = 'suit', helmet = 0, helmetT = -1, sw = [false, false, false], count = 11, alt = 0, holding = false, fuel = 1, shake = 0,
     booster = -1, orbitT = 0, earthTapped = false, tli = 0, moonSize = 0, items = [], day = 1, dim = 0, land = null, walk = null, btn = null, fade = 0, done = false, nagAt = 0, crashes = 0;
   const stars = [...Array(140)].map(() => ({ x: (Math.random() - .5) * 2, y: (Math.random() - .5) * 2, z: Math.random(), b: .4 + Math.random() * .6 }));
-  const clouds = [...Array(9)].map((_, i) => ({ x: Math.random(), y: i / 9, s: .6 + Math.random() * .8 }));
+  // clouds hang at different heights and distances, so climbing through them looks 3D (near ones are big and pass fast)
+  const clouds = [...Array(26)].map((_, i) => ({ h: .06 + (i / 26) * .34 + Math.random() * .03, x: (Math.random() - .5) * 2.4, d: .35 + Math.random() * .75, s: .7 + Math.random() * .8, p: Math.random() * 6 })).sort((a, b) => b.d - a.d);
+  const smoke = [...Array(14)].map((_, i) => ({ x: (i / 13 - .5) * 1.6, s: .8 + Math.random() * .6, p: Math.random() * 6 }));
   let hot = [];   // the things you can tap this frame: { x, y, r | w,h, id }
   const my = () => tok;
   const ok = k => alive && k === tok;
-  const say = id => { if (!alive) return Promise.resolve(); introIds = [id]; return Sound.say(id); };
+  const say = id => { if (!alive) return Promise.resolve(); introIds = [id]; nagAt = performance.now(); return Sound.say(id); };
   const waits = [];
   const waitFor = pred => new Promise(res => waits.push({ pred, res }));
   const sleep = ms => waitFor((s => () => performance.now() - s > ms)(performance.now()));
@@ -9769,6 +9788,19 @@ function moonGame(root, api) {
     for (const s of stars) { const x = ((s.x * .5 + .5) * W + drift * s.b * 40) % W, y = (s.y * .5 + .5) * winB(); g.globalAlpha = alpha * s.b * (.7 + .3 * Math.sin(t * 3 + s.x * 9)); g.fillRect((x + W) % W, y, 1.6, 1.6); }
     g.globalAlpha = 1;
   }
+  // stars streaming past in 3D, drawn as short streaks (motion), coming out from the middle of the view
+  function streak(B, sp) {
+    const cx = W / 2, cy = B * .45; g.strokeStyle = '#fff'; g.lineCap = 'round';
+    for (const s of stars) {
+      const z0 = s.z; s.z -= sp * .016; if (s.z <= .03) { s.z = 1; s.x = (Math.random() - .5) * 2; s.y = (Math.random() - .5) * 2; continue; }
+      const px = cx + s.x / s.z * W * .25, py = cy + s.y / s.z * B * .25, qx = cx + s.x / z0 * W * .25, qy = cy + s.y / z0 * B * .25;
+      if (px < -10 || px > W + 10 || py < -10 || py > B + 10) continue;
+      g.globalAlpha = Math.min(1, (1 - s.z) * 1.4) * s.b; g.lineWidth = Math.min(2.6, .5 / s.z);
+      g.beginPath(); g.moveTo(qx - (px - qx) * 3, qy - (py - qy) * 3); g.lineTo(px, py); g.stroke();
+    }
+    g.globalAlpha = 1; g.lineCap = 'butt';
+  }
+  const moonR = (B, m) => 24 + m * m * B * .5;
   function moonBall(cx, cy, r, lit = 1) {
     const gr = g.createRadialGradient(cx - r * .35, cy - r * .35, r * .1, cx, cy, r); gr.addColorStop(0, '#f4f4f0'); gr.addColorStop(.7, '#c9c9c4'); gr.addColorStop(1, '#8e8e8a');
     g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill();
@@ -9792,48 +9824,98 @@ function moonGame(root, api) {
   function outside() {
     const B = winB();
     if (scene === 'suit') {
-      const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#2b3b6e'); gr.addColorStop(1, '#4a5d96'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
-      g.fillStyle = 'rgba(255,255,255,.06)'; for (let i = 0; i < 6; i++) g.fillRect(i * W / 6 + 6, H * .1, W / 6 - 12, H * .55);
-      g.fillStyle = '#26315a'; g.fillRect(0, H * .72, W, H * .28);
+      // the suit-up room, in perspective: a back wall with a big window (our rocket waits out on the pad), lockers on both sides, a shiny floor
+      const vx = W / 2, vy = H * .42, bw = W * .56, bh = H * .4, bl = vx - bw / 2, bt = vy - bh * .55, br = bl + bw, bb = bt + bh;
+      g.fillStyle = '#34457a'; g.fillRect(0, 0, W, H);
+      g.fillStyle = '#2a3866'; g.beginPath(); g.moveTo(0, 0); g.lineTo(bl, bt); g.lineTo(bl, bb); g.lineTo(0, H); g.fill(); g.beginPath(); g.moveTo(W, 0); g.lineTo(br, bt); g.lineTo(br, bb); g.lineTo(W, H); g.fill();
+      const fg = g.createLinearGradient(0, bb, 0, H); fg.addColorStop(0, '#5a6aa0'); fg.addColorStop(1, '#2c3864'); g.fillStyle = fg; g.beginPath(); g.moveTo(bl, bb); g.lineTo(br, bb); g.lineTo(W, H); g.lineTo(0, H); g.fill();
+      g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 2; for (let i = 1; i < 6; i++) { const f = i / 6; g.beginPath(); g.moveTo(lerp(bl, 0, f), lerp(bb, H, f)); g.lineTo(lerp(br, W, f), lerp(bb, H, f)); g.stroke(); }
+      g.fillStyle = '#3e5090'; g.fillRect(bl, bt, bw, bh);
+      const ww = bw * .7, wx = vx - ww / 2, wy = bt + bh * .12, wh = bh * .62; const sk = g.createLinearGradient(0, wy, 0, wy + wh); sk.addColorStop(0, '#5aa8ff'); sk.addColorStop(1, '#c8ecff'); g.fillStyle = sk; g.fillRect(wx, wy, ww, wh);
+      g.fillStyle = '#7fcf6a'; g.fillRect(wx, wy + wh * .8, ww, wh * .2);
+      const rx = wx + ww * .62, ry = wy + wh * .8; g.fillStyle = '#f2f2f2'; g.fillRect(rx - 5, ry - wh * .6, 10, wh * .6); g.beginPath(); g.moveTo(rx - 5, ry - wh * .6); g.lineTo(rx, ry - wh * .72); g.lineTo(rx + 5, ry - wh * .6); g.fill(); g.fillStyle = '#d9483b'; g.fillRect(rx - 12, ry - wh * .5, 3, wh * .5);
+      g.strokeStyle = '#1f2a52'; g.lineWidth = 6; g.strokeRect(wx, wy, ww, wh); g.beginPath(); g.moveTo(vx, wy); g.lineTo(vx, wy + wh); g.stroke();
+      for (const sd of [-1, 1]) for (let i = 0; i < 3; i++) {   // lockers along each side wall
+        const f0 = .15 + i * .26, f1 = f0 + .2, X = (f, y) => sd < 0 ? [lerp(0, bl, f), lerp(y, lerp(bt, bb, (y - 0) / H), f)] : [lerp(W, br, f), lerp(y, lerp(bt, bb, (y - 0) / H), f)];
+        const p = [X(f0, H * .12), X(f1, H * .12), X(f1, H * .78), X(f0, H * .78)]; g.fillStyle = '#4a5ea0'; g.beginPath(); p.forEach(q => g.lineTo(q[0], q[1])); g.closePath(); g.fill(); g.strokeStyle = '#26315a'; g.lineWidth = 2; g.stroke();
+      }
       return;
     }
     if (scene === 'pad' || scene === 'launch') {
-      const k = scene === 'pad' ? 0 : Math.min(1, alt);
-      const sky = g.createLinearGradient(0, 0, 0, B); sky.addColorStop(0, mix('#3d8bff', '#02030a', Math.min(1, k * 1.25))); sky.addColorStop(1, mix('#b8e2ff', '#0a0f2a', Math.min(1, k * 1.1)));
-      g.fillStyle = sky; g.fillRect(0, 0, W, B); starsFlat(Math.max(0, k - .55) * 2.2);
-      // the ground and the launch tower drop away below as we climb
-      const gy = B * .78 + k * B * 2.2;
-      if (gy < B + 40) {
-        g.fillStyle = '#6cc46a'; g.fillRect(0, gy, W, B - gy + 40); g.fillStyle = '#5aa8e0'; g.fillRect(W * .62, gy + 6, W * .5, 10);
-        const tx = W * .18, th = B * .7; g.strokeStyle = '#d9483b'; g.lineWidth = 5; g.beginPath(); g.moveTo(tx, gy); g.lineTo(tx, gy - th); g.moveTo(tx + 26, gy); g.lineTo(tx + 26, gy - th); g.stroke();
-        g.lineWidth = 2.5; for (let y = 0; y < th; y += 18) { g.beginPath(); g.moveTo(tx, gy - y); g.lineTo(tx + 26, gy - y - 18); g.moveTo(tx + 26, gy - y); g.lineTo(tx, gy - y - 18); g.stroke(); }
-        g.fillStyle = '#ffd23f'; g.beginPath(); g.arc(tx + 13, gy - th - 6, 5 + Math.sin(t * 6) * 1.5, 0, 7); g.fill();
+      const a = scene === 'pad' ? 0 : alt, k = Math.min(1, a);
+      // the sky: blue, then deep blue, then black space (slowly, as the air thins out)
+      const dark = Math.min(1, Math.max(0, (a - .15) / .7)), d2 = dark * dark * (3 - 2 * dark);
+      const sky = g.createLinearGradient(0, 0, 0, B); sky.addColorStop(0, mix('#3d8bff', '#02030a', d2)); sky.addColorStop(1, mix('#bfe6ff', '#0b1a44', d2));
+      g.fillStyle = sky; g.fillRect(0, 0, W, B); starsFlat(Math.max(0, (a - .5) * 2));
+      // the ground and launch tower: we rise straight up, so they slide away below the window
+      const up = Math.min(1, a / .22), gy = B * .74 + up * up * B * .9;
+      if (gy < B + 10) {
+        const gg = g.createLinearGradient(0, gy, 0, B); gg.addColorStop(0, '#8fd17a'); gg.addColorStop(1, '#4f9e4c'); g.fillStyle = gg; g.fillRect(0, gy, W, B - gy + 20);
+        g.fillStyle = '#6fb3e8'; g.beginPath(); g.moveTo(W * .55, gy); g.lineTo(W, gy); g.lineTo(W, gy + 16); g.lineTo(W * .62, gy + 10); g.fill();
+        g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(0, gy, W, 2);
+        // the tower is right beside us: it's close, so it rushes down faster than the ground
+        const tg = B * .74 + up * B * 2.6, tx = W * .12, th = B * 1.2;
+        if (tg - th < B) {
+          g.strokeStyle = '#d9483b'; g.lineWidth = 7; g.beginPath(); g.moveTo(tx, tg); g.lineTo(tx, tg - th); g.moveTo(tx + 38, tg); g.lineTo(tx + 38, tg - th); g.stroke();
+          g.lineWidth = 3; for (let y = 0; y < th; y += 24) { g.beginPath(); g.moveTo(tx, tg - y); g.lineTo(tx + 38, tg - y - 24); g.moveTo(tx + 38, tg - y); g.lineTo(tx, tg - y - 24); g.stroke(); }
+          g.strokeStyle = '#a8352b'; g.lineWidth = 5; g.beginPath(); g.moveTo(tx + 38, tg - th * .55); g.lineTo(tx + 80, tg - th * .55); g.stroke();
+          g.fillStyle = '#ffd23f'; g.beginPath(); g.arc(tx + 19, tg - th - 6, 5, 0, 7); g.fill();
+        }
       }
-      // clouds stream past, downward
+      // smoke billowing up around us at liftoff
+      if (scene === 'launch' && a < .12) {
+        const sk = 1 - a / .12;
+        for (const m of smoke) { const yy = B - (B * .35) * (1 - sk) + Math.sin(t * 1.3 + m.p) * 6, xx = W / 2 + m.x * W * (.5 + (1 - sk) * .6), r = m.s * (40 + (1 - sk) * 60);
+          g.globalAlpha = .75 * sk; const sg = g.createRadialGradient(xx, yy, r * .2, xx, yy, r); sg.addColorStop(0, '#f4f1ec'); sg.addColorStop(1, 'rgba(220,214,206,0)'); g.fillStyle = sg; g.beginPath(); g.arc(xx, yy, r, 0, 7); g.fill(); }
+        g.globalAlpha = 1;
+      }
+      // clouds in 3D: each hangs at its own height; as we climb past, it slides down and out of view
       for (const c of clouds) {
-        const yy = ((c.y + k * 6 + (scene === 'launch' ? t * .02 : 0)) % 1.4) * B * 1.1 - B * .2, xx = c.x * W;
-        if (k > .8) break;
-        g.globalAlpha = .85 * (1 - k); g.fillStyle = '#fff'; const s = c.s * (1 + k * 2) * 26;
-        g.beginPath(); g.arc(xx, yy, s, 0, 7); g.arc(xx + s * .9, yy + s * .2, s * .75, 0, 7); g.arc(xx - s * .9, yy + s * .25, s * .7, 0, 7); g.fill(); g.globalAlpha = 1;
+        const rel = c.h - a, y = B * .45 - rel * B * 2.4 / c.d, x = W / 2 + c.x * W * .5 / c.d, r = c.s * 26 / c.d;
+        if (y < -r * 2 || y > B + r * 2 || x < -r * 3 || x > W + r * 3) continue;
+        g.globalAlpha = Math.min(.9, 1.2 - Math.abs(rel) * 3) * (1 - d2 * .7); if (g.globalAlpha <= 0) continue;
+        const cg = g.createRadialGradient(x, y - r * .3, r * .2, x, y, r * 1.6); cg.addColorStop(0, '#ffffff'); cg.addColorStop(1, 'rgba(230,240,255,0)'); g.fillStyle = cg;
+        g.beginPath(); g.ellipse(x, y, r * 1.7, r * .9, 0, 0, 7); g.fill(); g.beginPath(); g.ellipse(x - r * .7, y + r * .1, r, r * .7, 0, 0, 7); g.ellipse(x + r * .8, y + r * .05, r * 1.1, r * .75, 0, 0, 7); g.fill();
       }
+      g.globalAlpha = 1;
+      // rushing air: thin streaks while we go fast through the sky
+      if (scene === 'launch' && a > .03 && a < .7 && vel > .01) {
+        g.strokeStyle = `rgba(255,255,255,${Math.min(.35, vel * 4) * (1 - d2)})`; g.lineWidth = 1.4;
+        for (let i = 0; i < 18; i++) { const x = (i * 97.3 % 1) * W, ph = ((a * 18 + i * .37) % 1), y = ph * B * 1.3 - B * .15, L = 30 + vel * 400; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + L); g.stroke(); }
+      }
+      // high up, the rocket tips over, and the curved Earth comes into view below
+      if (a > .55) {
+        const q = Math.min(1, (a - .55) / .45), qq = q * q * (3 - 2 * q), R = W * (3.2 - qq * 1.9), top = B + 40 - qq * B * .36, cx = W / 2, cy = top + R;
+        const eg = g.createLinearGradient(0, top, 0, B); eg.addColorStop(0, '#5fb6ff'); eg.addColorStop(.25, '#2f7fd6'); eg.addColorStop(1, '#1d5fb8');
+        g.fillStyle = eg; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fill();
+        g.save(); g.beginPath(); g.arc(cx, cy, R, 0, 7); g.clip();
+        g.fillStyle = 'rgba(79,191,106,.85)'; for (const [x, w] of [[-.35, .22], [.1, .16], [.42, .2]]) { g.beginPath(); g.ellipse(cx + x * W, top + 26, w * W, 14, 0, 0, 7); g.fill(); }
+        g.fillStyle = 'rgba(255,255,255,.7)'; for (const [x, w] of [[-.2, .14], [.25, .12], [-.5, .1]]) { g.beginPath(); g.ellipse(cx + x * W, top + 12, w * W, 5, 0, 0, 7); g.fill(); }
+        g.restore();
+        g.strokeStyle = 'rgba(140,200,255,.65)'; g.lineWidth = 8; g.beginPath(); g.arc(cx, cy, R + 3, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
+        g.strokeStyle = 'rgba(140,200,255,.25)'; g.lineWidth = 18; g.beginPath(); g.arc(cx, cy, R + 10, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
+      }
+      // the engines' fire lights up the bottom of the view
+      if (glow > .01) { const fg = g.createLinearGradient(0, B * .55, 0, B); fg.addColorStop(0, 'rgba(255,150,40,0)'); fg.addColorStop(1, `rgba(255,150,40,${.35 * glow * (1 - d2 * .6)})`); g.fillStyle = fg; g.fillRect(0, B * .55, W, B * .45); }
       return;
     }
     if (scene === 'orbit') {
-      g.fillStyle = '#02030a'; g.fillRect(0, 0, W, B); starsFlat(1, t * .3);
-      const R = Math.min(W * .95, B * 1.7), rise = Math.min(1, orbitT / 3), ey = B + R * .5 + (1 - rise) * B * .6;
+      g.fillStyle = '#02030a'; g.fillRect(0, 0, W, B);
+      if (tli > 0) streak(B, tli * .5); else starsFlat(1, t * .3);
+      const R0 = Math.min(W * .95, B * 1.7), rise = Math.min(1, orbitT / 2.5), sr = rise * rise * (3 - 2 * rise), away = tli * tli;
+      const R = R0 * (1 - away * .55), ey = B + R * .5 + (1 - sr) * B * .35 + away * B * .9;
       earthBall(W / 2, ey, R, t * .015);
-      g.beginPath(); g.arc(W / 2, ey, R * 1.02, Math.PI * 1.1, Math.PI * 1.9); g.lineWidth = 6; g.strokeStyle = 'rgba(150,210,255,.5)'; g.stroke();
+      g.strokeStyle = 'rgba(150,210,255,.5)'; g.lineWidth = 6; g.beginPath(); g.arc(W / 2, ey, R * 1.02, Math.PI * 1.08, Math.PI * 1.92); g.stroke();
+      g.strokeStyle = 'rgba(150,210,255,.18)'; g.lineWidth = 16; g.beginPath(); g.arc(W / 2, ey, R * 1.04, Math.PI * 1.08, Math.PI * 1.92); g.stroke();
       const sx = W * .85, sy = B * .18; const sg = g.createRadialGradient(sx, sy, 2, sx, sy, 60); sg.addColorStop(0, 'rgba(255,255,230,1)'); sg.addColorStop(1, 'rgba(255,255,200,0)'); g.fillStyle = sg; g.fillRect(sx - 60, sy - 60, 120, 120);
-      if (tli > 0) { moonBall(W * .5, B * .28, 6 + tli * 6); }
+      if (tli > 0) moonBall(W / 2, lerp(B * .3, B * .45, tli), moonR(B, 0) * (.3 + tli * .7), .7);
       return;
     }
     if (scene === 'cruise') {
       g.fillStyle = '#02030a'; g.fillRect(0, 0, W, B);
       const cx = W / 2, cy = B * .45, sp = .25 + (1 - moonSize) * .3;
-      g.fillStyle = '#fff';
-      for (const s of stars) { s.z -= sp * .016 * (done ? 0 : 1); if (s.z <= .02) { s.z = 1; s.x = (Math.random() - .5) * 2; s.y = (Math.random() - .5) * 2; } const px = cx + s.x / s.z * W * .25, py = cy + s.y / s.z * B * .25; if (px < 0 || px > W || py < 0 || py > B) continue; const sz = Math.min(3, .6 / s.z); g.globalAlpha = Math.min(1, (1 - s.z) * 1.4) * s.b; g.fillRect(px, py, sz, sz); }
-      g.globalAlpha = 1;
-      moonBall(cx, cy, 10 + moonSize * moonSize * B * .55, .7 + moonSize * .3);
+      streak(B, sp);
+      moonBall(cx, cy, moonR(B, moonSize), .7 + moonSize * .3);
       if (dim > 0) { g.fillStyle = `rgba(0,0,20,${dim * .55})`; g.fillRect(0, 0, W, B); }
       return;
     }
@@ -9849,7 +9931,9 @@ function moonGame(root, api) {
         g.fillStyle = 'rgba(85,85,88,.55)'; g.beginPath(); g.ellipse(sx, sy, r, r * .62, 0, 0, 7); g.fill();
         g.strokeStyle = 'rgba(235,235,230,.6)'; g.lineWidth = Math.max(1, r * .1); g.beginPath(); g.ellipse(sx, sy + r * .04, r, r * .62, 0, .25, Math.PI - .25); g.stroke();
       }
-      { const [sx, sy] = P(0, 0), r = 9 * F / he; g.strokeStyle = `rgba(255,214,63,${.6 + .4 * Math.sin(t * 5)})`; g.lineWidth = 3; g.setLineDash([8, 6]); g.beginPath(); g.ellipse(sx, sy, r, r * .62, 0, 0, 7); g.stroke(); g.setLineDash([]); }
+      { const [sx, sy] = P(0, 0), r = 9 * F / he; g.strokeStyle = `rgba(255,214,63,${.6 + .4 * Math.sin(t * 5)})`; g.lineWidth = 3; g.setLineDash([8, 6]); g.beginPath(); g.ellipse(sx, sy, r, r * .62, 0, 0, 7); g.stroke(); g.setLineDash([]);
+        const so = Math.min(.55, 30 / he), sr = 4 * F / he; g.fillStyle = `rgba(20,20,26,${so})`; g.beginPath(); g.ellipse(sx + sr * .3, sy + sr * .1, sr, sr * .5, 0, 0, 7); g.fill();   // our shadow, getting darker as we get close
+        if (land.h < 30 && glow > .05) { const q = (1 - land.h / 30) * glow; g.strokeStyle = `rgba(225,225,218,${.5 * q})`; g.lineWidth = 2; for (let i = 0; i < 22; i++) { const an = i / 22 * Math.PI * 2 + t * .7, r0 = sr * (1 + ((t * 1.8 + i * .13) % 1) * 2.2); g.beginPath(); g.moveTo(sx + Math.cos(an) * r0, sy + Math.sin(an) * r0 * .5); g.lineTo(sx + Math.cos(an) * (r0 + 18 * q), sy + Math.sin(an) * (r0 + 18 * q) * .5); g.stroke(); } } }
       g.restore();
       // the lander's legs, at the bottom of the window
       g.strokeStyle = '#c9a23a'; g.lineWidth = 6; g.beginPath(); g.moveTo(W * .12, B); g.lineTo(W * .2, B - 40); g.moveTo(W * .88, B); g.lineTo(W * .8, B - 40); g.stroke();
@@ -9880,58 +9964,78 @@ function moonGame(root, api) {
   // ---- the cockpit around the window, and the control panel ----
   function cockpit() {
     const B = winB();
-    // the cabin wall around a big rounded window
-    g.fillStyle = '#4a5268';
-    g.beginPath(); g.rect(0, 0, W, B); g.moveTo(W * .07 + 22, 14); g.arcTo(W * .07, 14, W * .07 - 2, 40, 22); g.lineTo(10, B - 30); g.arcTo(8, B - 10, 30, B - 10, 20); g.lineTo(W - 30, B - 10); g.arcTo(W - 8, B - 10, W - 10, B - 30, 20); g.lineTo(W * .93 + 2, 40); g.arcTo(W * .93, 14, W * .93 - 22, 14, 22); g.closePath(); g.fill('evenodd');
-    g.strokeStyle = '#2b3142'; g.lineWidth = 6; g.beginPath(); g.moveTo(W * .07 + 22, 14); g.arcTo(W * .07, 14, W * .07 - 2, 40, 22); g.lineTo(10, B - 30); g.arcTo(8, B - 10, 30, B - 10, 20); g.lineTo(W - 30, B - 10); g.arcTo(W - 8, B - 10, W - 10, B - 30, 20); g.lineTo(W * .93 + 2, 40); g.arcTo(W * .93, 14, W * .93 - 22, 14, 22); g.closePath(); g.stroke();
-    // glass glare
-    g.fillStyle = 'rgba(255,255,255,.06)'; g.beginPath(); g.moveTo(W * .2, 20); g.lineTo(W * .36, 20); g.lineTo(W * .16, B - 14); g.lineTo(W * .02, B - 14); g.fill();
-    // the panel
-    const pg = g.createLinearGradient(0, B, 0, H); pg.addColorStop(0, '#3a4155'); pg.addColorStop(1, '#1f2433'); g.fillStyle = pg; g.fillRect(0, B, W, H - B);
-    g.fillStyle = '#596180'; g.fillRect(0, B, W, 4);
-    for (const x of [14, W - 14]) for (const y of [B + 16, H - 16]) { g.fillStyle = '#7a829c'; g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill(); }
-    const ph = H - B;
+    const winPath = (fresh = true) => { if (fresh) g.beginPath(); g.moveTo(W * .07 + 22, 14); g.arcTo(W * .07, 14, W * .07 - 2, 40, 22); g.lineTo(12, B - 30); g.arcTo(10, B - 10, 32, B - 10, 20); g.lineTo(W - 32, B - 10); g.arcTo(W - 10, B - 10, W - 12, B - 30, 20); g.lineTo(W * .93 + 2, 40); g.arcTo(W * .93, 14, W * .93 - 22, 14, 22); g.closePath(); };
+    // the cabin wall curves around you: darker at the sides
+    const wg = g.createLinearGradient(0, 0, W, 0); wg.addColorStop(0, '#262b3b'); wg.addColorStop(.18, '#4a5268'); wg.addColorStop(.82, '#4a5268'); wg.addColorStop(1, '#262b3b');
+    g.save(); g.beginPath(); g.rect(0, 0, W, B + 2); winPath(false); g.fillStyle = wg; g.fill('evenodd'); g.restore();
+    // the window's thick frame: a dark outer rim and a lit inner edge, so it looks deep
+    winPath(); g.strokeStyle = '#1b2030'; g.lineWidth = 12; g.stroke(); winPath(); g.strokeStyle = '#8a93b0'; g.lineWidth = 2.5; g.stroke();
+    for (const [x, y] of [[W * .07 + 10, 22], [W * .93 - 10, 22], [22, B - 20], [W - 22, B - 20]]) { g.fillStyle = '#a4acc6'; g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fill(); }
+    // glass: a soft tint and a slanted glare
+    g.save(); winPath(); g.clip(); const gl = g.createLinearGradient(0, 0, W, B); gl.addColorStop(0, 'rgba(255,255,255,.08)'); gl.addColorStop(.35, 'rgba(255,255,255,0)'); g.fillStyle = gl; g.fillRect(0, 0, W, B);
+    g.fillStyle = 'rgba(255,255,255,.06)'; g.beginPath(); g.moveTo(W * .2, 0); g.lineTo(W * .34, 0); g.lineTo(W * .14, B); g.lineTo(W * .02, B); g.fill(); g.restore();
+    // the panel: a sloped lip with little status lights, then the flat face
+    g.fillStyle = '#5a6383'; g.beginPath(); g.moveTo(0, B); g.lineTo(W, B); g.lineTo(W - 16, B + 14); g.lineTo(16, B + 14); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(0, B, W, 2);
+    for (let i = 0; i < 9; i++) { const x = W * .3 + i * W * .05, on = Math.sin(t * (1.3 + i * .37) + i * 2) > -.2; g.fillStyle = on ? ['#45c46a', '#ffd23f', '#4ab3ff'][i % 3] : '#2a3048'; g.beginPath(); g.arc(x, B + 7, 2.4, 0, 7); g.fill(); }
+    const PB = B + 14;
+    const pg = g.createLinearGradient(0, PB, 0, H); pg.addColorStop(0, '#3a4155'); pg.addColorStop(1, '#1b1f2c'); g.fillStyle = pg; g.fillRect(0, PB, W, H - PB);
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, PB, W, 4);
+    for (const x of [14, W - 14]) for (const y of [PB + 12, H - 14]) { g.fillStyle = '#7a829c'; g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill(); }
+    const ph = H - PB;
+    // Lay the panel out to fit whatever shape the screen is. Tall panel: gauges in a row on top, controls below.
+    // Short panel (a short phone, or sideways): gauges at the two sides, controls in the middle.
+    const noG = scene === 'pad' && step === 1;   // during the switch check the gauges step aside, so the switches get the whole panel
+    const side = ph < 210, gw = side ? Math.min(W * .24, 150) : Math.min(W * .3, 170), gh = side ? Math.min(70, ph - 24) : Math.max(40, Math.min(70, ph * .22));
+    const gy = side ? PB + (ph - gh) / 2 : PB + 10;
+    const A = noG ? { l: 12, r: W - 12, t: PB + 8, b: H - 12 } : side ? { l: 12 + gw + 10, r: W - 12 - gw - 10, t: PB + 8, b: H - 10 } : { l: 12, r: W - 12, t: gy + gh + 10, b: H - 12 };
+    const aw = A.r - A.l, ah = A.b - A.t, acx = (A.l + A.r) / 2, acy = (A.t + A.b) / 2;
     // gauges: height (or distance) and fuel
-    const gw = W * .26, gh = Math.min(70, ph * .3), gy = B + 14;
+    if (!noG) {
     rr(12, gy, gw, gh, 10); g.fillStyle = '#0d1424'; g.fill(); g.strokeStyle = '#6b7390'; g.lineWidth = 2; g.stroke();
-    const [lab, val, col] = gauge(); text(lab, 12 + gw / 2, gy + gh * .3, 11, '#9fb6d8'); text(val, 12 + gw / 2, gy + gh * .68, Math.min(20, gh * .32), col);
-    rr(W - 12 - gw, gy, gw, gh, 10); g.fillStyle = '#0d1424'; g.fill(); g.stroke(); text('FUEL', W - 12 - gw / 2, gy + gh * .3, 11, '#9fb6d8');
+    const [lab, val, col] = gauge(), fs = Math.min(20, gh * .32, gw / 7); text(lab, 12 + gw / 2, gy + gh * .3, Math.min(11, gw / 10), '#9fb6d8'); text(val, 12 + gw / 2, gy + gh * .68, fs, col);
+    rr(W - 12 - gw, gy, gw, gh, 10); g.fillStyle = '#0d1424'; g.fill(); g.stroke(); text('FUEL', W - 12 - gw / 2, gy + gh * .3, Math.min(11, gw / 10), '#9fb6d8');
     rr(W - 12 - gw + 10, gy + gh * .55, gw - 20, gh * .25, 5); g.fillStyle = '#2a3048'; g.fill(); if (fuel > 0) { rr(W - 12 - gw + 10, gy + gh * .55, (gw - 20) * fuel, gh * .25, 5); g.fillStyle = fuel > .25 ? '#45c46a' : '#ff5a4e'; g.fill(); }
-    // the middle: switches, the countdown screen, or the big button
+    }
+    // the middle: the switches, or the big button, always sized to fit the space it has
     if (scene === 'pad' && step === 1) {
-      const names = [['⛽', 'FUEL'], ['🔋', 'POWER'], ['📻', 'RADIO']];
+      const names = [['⛽', 'FUEL'], ['🔋', 'POWER'], ['📻', 'RADIO']], sc = Math.min(1.25, aw / (3 * 68 + 2 * 14), ah / 92), gap = (aw - 3 * 68 * sc) / 4;
       names.forEach(([ic, nm], i) => {
-        const x = W * (.22 + i * .28), y = B + ph * .62, on = sw[i];
-        rr(x - 30, y - 34, 60, 78, 10); g.fillStyle = '#262c3e'; g.fill(); g.strokeStyle = on ? '#45c46a' : '#6b7390'; g.lineWidth = 3; g.stroke();
-        emoji(ic, x, y - 18, 20);
-        g.fillStyle = '#9aa0b4'; rr(x - 7, y - 2, 14, 30, 6); g.fill();
-        g.fillStyle = on ? '#45c46a' : '#ff5a4e'; g.beginPath(); g.arc(x, on ? y + 2 : y + 24, 9, 0, 7); g.fill();
-        text(nm, x, y + 38, 11, on ? '#7fe39a' : '#c9cbe0');
-        hot.push({ x: x - 34, y: y - 38, w: 68, h: 86, id: 'sw' + i });
-        if (!on && sw.indexOf(false) === i) { g.strokeStyle = `rgba(255,214,63,${.4 + .4 * Math.sin(t * 5)})`; g.lineWidth = 4; rr(x - 34, y - 38, 68, 86, 12); g.stroke(); }
+        const x = A.l + gap * (i + 1) + 68 * sc * (i + .5), y = acy - 4 * sc, on = sw[i];
+        g.save(); g.translate(x, y); g.scale(sc, sc);
+        rr(-30, -34, 60, 78, 10); g.fillStyle = '#262c3e'; g.fill(); g.strokeStyle = on ? '#45c46a' : '#6b7390'; g.lineWidth = 3; g.stroke();
+        emoji(ic, 0, -18, 20);
+        g.fillStyle = '#9aa0b4'; rr(-7, -2, 14, 30, 6); g.fill();
+        g.fillStyle = on ? '#45c46a' : '#ff5a4e'; g.beginPath(); g.arc(0, on ? 2 : 24, 9, 0, 7); g.fill();
+        text(nm, 0, 38, 11, on ? '#7fe39a' : '#c9cbe0');
+        if (!on && sw.indexOf(false) === i) { g.strokeStyle = `rgba(255,214,63,${.4 + .4 * Math.sin(t * 5)})`; g.lineWidth = 4; rr(-34, -38, 68, 86, 12); g.stroke(); }
+        g.restore();
+        hot.push({ x: x - 34 * sc, y: y - 38 * sc, w: 68 * sc, h: 86 * sc, id: 'sw' + i });
       });
     }
-    if (booster >= 0) {   // the rear camera: the empty booster tumbling away, down toward Earth
-      const bx = 12, by = gy + gh + 10, bw = gw, bh = Math.min(70, ph - gh - 40); if (bh > 30) {
-        rr(bx, by, bw, bh, 8); g.fillStyle = '#0b1b3a'; g.fill(); g.save(); rr(bx, by, bw, bh, 8); g.clip();
-        g.fillStyle = '#1d5fb8'; g.beginPath(); g.arc(bx + bw / 2, by + bh + bw * 1.2 - booster * 6, bw * 1.3, 0, 7); g.fill();
-        const k = Math.max(.15, 1 - booster * .25); g.translate(bx + bw / 2, by + bh * (.3 + booster * .1)); g.rotate(booster * 1.4); g.scale(k, k);
-        g.fillStyle = '#f2f2f2'; g.fillRect(-7, -20, 14, 40); g.fillStyle = '#333'; g.fillRect(-7, -6, 14, 5); g.fillRect(-9, 18, 18, 5); g.restore();
-        text('REAR CAMERA', bx + bw / 2, by + 10, 8, '#9fb6d8');
-      }
-    }
     if (btn) {
-      const r = Math.min(W * .15, ph * .28), x = W / 2, y = B + ph * .58, glow = .5 + .5 * Math.sin(t * 4), pressed = holding && btn.hold;
-      g.fillStyle = '#20263a'; g.beginPath(); g.arc(x, y + 6, r + 10, 0, 7); g.fill();
+      const r = Math.max(22, Math.min(70, W * .15, ah / 2 - 8, aw / 2 - 8)), x = acx, y = acy - 2, glow = .5 + .5 * Math.sin(t * 4), pressed = holding && btn.hold;
+      g.fillStyle = '#20263a'; g.beginPath(); g.arc(x, y + 5, r + 8, 0, 7); g.fill();
       g.shadowColor = btn.col; g.shadowBlur = 14 + glow * 16; g.fillStyle = btn.col; g.beginPath(); g.arc(x, y + (pressed ? 4 : 0), r, 0, 7); g.fill(); g.shadowBlur = 0;
       g.fillStyle = 'rgba(255,255,255,.3)'; g.beginPath(); g.ellipse(x - r * .25, y - r * .4 + (pressed ? 4 : 0), r * .45, r * .22, -.4, 0, 7); g.fill();
       emoji(btn.ic, x, y - r * .18 + (pressed ? 4 : 0), r * .62); text(btn.label, x, y + r * .45 + (pressed ? 4 : 0), Math.max(10, r * .22), '#fff');
       hot.push({ x, y, r: r + 14, id: 'btn' });
     }
-    if (scene === 'orbit' && tli > 0 || (scene === 'orbit' && btn && btn.hold)) {   // the trip meter: Earth to Moon
-      const y = gy + gh + 20, x0 = W * .3, x1 = W * .7; g.strokeStyle = '#6b7390'; g.lineWidth = 6; g.lineCap = 'round'; g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke();
+    // the rear camera, as a small picture in the corner of the window: the empty booster tumbling away
+    if (booster >= 0) {
+      const bw = Math.min(120, W * .3), bh = bw * .72, bx = 22, by = Math.min(B - bh - 16, 46);
+      rr(bx, by, bw, bh, 8); g.fillStyle = '#0b1b3a'; g.fill(); g.strokeStyle = '#6b7390'; g.lineWidth = 2; g.stroke(); g.save(); rr(bx, by, bw, bh, 8); g.clip();
+      g.fillStyle = '#1d5fb8'; g.beginPath(); g.arc(bx + bw / 2, by + bh + bw * 1.2 - booster * 6, bw * 1.3, 0, 7); g.fill();
+      const k = Math.max(.15, 1 - booster * .25); g.translate(bx + bw / 2, by + bh * (.35 + booster * .1)); g.rotate(booster * 1.4); g.scale(k, k);
+      g.fillStyle = '#f2f2f2'; g.fillRect(-7, -20, 14, 40); g.fillStyle = '#333'; g.fillRect(-7, -6, 14, 5); g.fillRect(-9, 18, 18, 5); g.restore();
+      text('REAR CAMERA', bx + bw / 2, by + 11, 9, '#9fb6d8');
+    }
+    // the trip meter, Earth to Moon, along the bottom of the window
+    if (scene === 'orbit' && (tli > 0 || (btn && btn.hold))) {
+      const y = B - 30, x0 = W * .25, x1 = W * .75; rr(x0 - 34, y - 26, x1 - x0 + 68, 40, 20); g.fillStyle = 'rgba(10,20,40,.6)'; g.fill();
+      g.strokeStyle = '#6b7390'; g.lineWidth = 6; g.lineCap = 'round'; g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke();
       g.strokeStyle = '#ffd23f'; g.beginPath(); g.moveTo(x0, y); g.lineTo(lerp(x0, x1, tli), y); g.stroke(); g.lineCap = 'butt';
-      emoji('🌍', x0 - 14, y, 18); emoji('🌕', x1 + 14, y, 18); emoji('🚀', lerp(x0, x1, tli), y - 14, 16);
+      emoji('🌍', x0 - 16, y, 18); emoji('🌕', x1 + 16, y, 18); emoji('🚀', lerp(x0, x1, tli), y - 13, 16);
     }
   }
   function gauge() {
@@ -9981,7 +10085,7 @@ function moonGame(root, api) {
   // ---- buttons on the screen (not on the panel): fly again ----
   function draw() {
     hot = [];
-    const sh = shake > 0 ? shake : 0; g.save(); if (sh) g.translate((Math.random() - .5) * sh * 6, (Math.random() - .5) * sh * 6);
+    const sh = Math.min(1, shake); g.save(); if (sh > .01) g.translate((Math.sin(t * 41) + Math.sin(t * 67) * .5) * sh * 2.2, (Math.sin(t * 37 + 1) + Math.sin(t * 59) * .5) * sh * 2.2);
     outside();
     if (scene !== 'walk' && scene !== 'suit') cockpit();
     if (scene === 'cruise') floaters();
@@ -10002,16 +10106,20 @@ function moonGame(root, api) {
   }
   // ---- the clock: physics for each part ----
   function update(dt) {
-    t += dt; if (shake > 0) shake = Math.max(0, shake - dt * .8);
+    t += dt; if (shake > 0) shake = Math.max(0, shake - dt * 1.2);
     if (helmetT >= 0) { helmetT += dt; helmet = Math.min(1, Math.max(0, (helmetT - .8) / .5)); }
+    const firing = holding && btn && btn.hold;
+    glow += ((firing ? 1 : 0) - glow) * Math.min(1, dt * (firing ? 6 : 2.5));   // the fire's light fades in and out smoothly
     if (scene === 'launch') {
-      if (holding && fuel > 0) { alt = Math.min(1, alt + dt * .075); fuel = Math.max(0, 1 - alt); shake = Math.max(shake, .6 - alt * .4); if (Math.random() < dt * 3) Sound.fx.rumble(.15); }
+      if (firing && fuel > 0) vel = Math.min(.1, vel + dt * .06); else vel = Math.max(0, vel - dt * .022);   // let go: the rocket keeps going, slowing gently
+      alt = Math.min(1, alt + vel * dt); if (booster < 0) fuel = Math.max(0, 1 - alt);   // after the booster drops, the next stage's full tank shows
+      shake = Math.max(shake, glow * (.35 + vel * 3));
     }
     if (booster >= 0) booster += dt;
-    if (scene === 'orbit') { orbitT += dt; if (holding && btn && btn.hold) { tli = Math.min(1, tli + dt * .14); fuel = Math.max(.25, fuel - dt * .03); shake = .25; } }
+    if (scene === 'orbit') { orbitT += dt; if (tli > 0) { if (firing) vel = Math.min(.16, vel + dt * .12); else vel = Math.max(0, vel - dt * .05); tli = Math.min(1, tli + vel * dt); if (firing) { fuel = Math.max(.4, fuel - dt * .03); shake = Math.max(shake, .25); } } }
     if (scene === 'cruise' && !done) {}
     if (scene === 'land' && land && !land.down) {
-      land.vy += 7.5 * (crashes >= 2 ? .7 : 1) * dt; if (holding) { land.vy = Math.max(2.5, land.vy - 19 * dt); fuel = Math.max(.08, fuel - dt * .01); shake = .2; }   // the engine slows you to a gentle drift down (never back up)
+      land.vy += 7.5 * (crashes >= 2 ? .7 : 1) * dt; if (holding) { land.vy = Math.max(2.5, land.vy - 19 * dt); fuel = Math.max(.08, fuel - dt * .01); shake = Math.max(shake, .2); }   // the engine slows you to a gentle drift down (never back up)
       land.vy = Math.max(-6, Math.min(40, land.vy)); land.h -= land.vy * dt;
       if (land.h <= 0) { land.h = 0; land.down = land.vy < (crashes >= 2 ? 12 : 9) ? 'soft' : 'hard'; for (let i = 0; i < 24; i++) land.dust.push({ x: W / 2 + (Math.random() - .5) * 120, y: winB() * .8, vx: (Math.random() - .5) * 200, vy: -Math.random() * 60, r: 6 + Math.random() * 10, t: 0 }); }
     }
@@ -10053,7 +10161,7 @@ function moonGame(root, api) {
     let pressed = false; tapHandler = id => { if (id === 'btn') pressed = true; };
     await waitFor(() => pressed || !ok(k)); if (!ok(k)) return;
     // 4. liftoff: hold to fire the engines
-    step = 3; scene = 'launch'; Sound.fx.rumble(1.2); shake = 1; btn = { ic: '🔥', label: 'HOLD', col: '#ff9f1c', hold: true }; tapHandler = null;
+    step = 3; scene = 'launch'; vel = 0; Sound.fx.rumble(1.2); shake = 1; btn = { ic: '🔥', label: 'HOLD', col: '#ff9f1c', hold: true }; tapHandler = null;
     say('moon_hold');
     const said = {};
     await waitFor(() => {
@@ -10078,7 +10186,7 @@ function moonGame(root, api) {
     tapHandler = (id, x, y) => { if (y > winB() * .62 && y < winB()) tapped = 'earth'; };
     await waitFor(() => { if (tapped !== 'earth') nag('moon_orbit', 12000); return tapped === 'earth' || !ok(k); }); if (!ok(k)) return;
     tapHandler = null; Sound.fx.magic(); await say('moon_earth'); if (!ok(k)) return;
-    step = 6; btn = { ic: '🔥', label: 'HOLD', col: '#ff9f1c', hold: true }; tli = .001; say('moon_tli');
+    step = 6; btn = { ic: '🔥', label: 'HOLD', col: '#ff9f1c', hold: true }; vel = 0; tli = .001; say('moon_tli');
     await waitFor(() => { if (!holding && tli < 1) nag('moon_tli', 10000); return tli >= 1 || !ok(k); }); if (!ok(k)) return;
     holding = false; Sound.fx.thrust(false); btn = null; Sound.fx.win(); await say('moon_tli_go'); if (!ok(k)) return;
     // 7. the trip: everything floats; three days to the Moon
@@ -10128,9 +10236,9 @@ function moonGame(root, api) {
     done = true; api.round(3); await say('moon_done'); if (!ok(k)) return;
     api.win();
   }
-  if (window.__moonHook) window.__moonHook({ peek: () => ({ want, scene, step, alt, tli, count, sw: sw.slice(), helmet, moonSize, day, done, crashes, land: land && { h: land.h, vy: land.vy, down: land.down }, walk: walk && { jumpT: walk.jumpT, flag: !!walk.flag, rock: walk.rock && walk.rock.got }, hot: hot.slice(), W, H, holding }) });   // for testing
+  if (window.__moonHook) window.__moonHook({ peek: () => ({ fits, want, scene, step, alt, tli, count, sw: sw.slice(), helmet, moonSize, day, done, crashes, land: land && { h: land.h, vy: land.vy, down: land.down }, walk: walk && { jumpT: walk.jumpT, flag: !!walk.flag, rock: walk.rock && walk.rock.got }, hot: hot.slice(), W, H, holding }) });   // for testing
   mission();
-  return () => { alive = false; tok++; cancelAnimationFrame(raf); ro.disconnect(); Sound.fx.thrust(false, true); freeCanvas(cv); };
+  return () => { alive = false; tok++; cancelAnimationFrame(raf); ro.disconnect(); removeEventListener('resize', onWin); if (bub) bub.style.minHeight = ''; Sound.fx.thrust(false, true); freeCanvas(cv); };
 }
 
 function doctorGame(root, api) {
