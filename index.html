@@ -661,7 +661,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 @media (max-width: 440px) { .arc-top { font-size: 16px; gap: 8px; padding-left: 12px; } .arc-score { font-size: 15px; padding: 6px 10px; } }
 .sci-fossil .sci-svg, .sci-bees .sci-svg { touch-action: none; }
 .fs-crumb { animation: fs-crumb .5s ease-out forwards; } @keyframes fs-crumb { to { translate: var(--dx) var(--dy); opacity: 0; } }
-.fs-built { animation: fs-built .9s ease-in-out 2; transform-origin: 200px 230px; } @keyframes fs-built { 30% { transform: translateY(-8px) scale(1.02); } 60% { transform: translateY(0) scale(1); } }
+.fs-built { animation: fs-built .9s ease-in-out 2; transform-origin: 200px 190px; } @keyframes fs-built { 30% { transform: translateY(-8px) scale(1.02); } 60% { transform: translateY(0) scale(1); } }
 .fs-gone { transition: opacity .25s, transform .25s; opacity: 0; transform-box: fill-box; transform-origin: center; transform: scale(.4); }
 .fs-found { animation: fsfound 1.2s ease-out; transform-box: fill-box; transform-origin: center; }
 @keyframes fsfound { 0% { filter: brightness(1.6); } 100% { filter: none; } }
@@ -8393,18 +8393,29 @@ function sciFossil(c) {
     leg: `<path d="M-6 -30 L6 -30 L8 0 L-4 0Z" fill="${BONE}" stroke="${BST}" stroke-width="2.4"/><circle cx="-5" cy="-31" r="6" fill="${BONE}" stroke="${BST}" stroke-width="2.4"/><circle cx="5" cy="-31" r="6" fill="${BONE}" stroke="${BST}" stroke-width="2.4"/>
       <path d="M-2 0 L8 0 L10 24 L0 24Z" fill="${BONE}" stroke="${BST}" stroke-width="2.4"/><circle cx="2" cy="0" r="6" fill="${BONE}" stroke="${BST}" stroke-width="2.4"/>
       <path d="M-4 24 L18 24 Q24 26 26 32 L-6 32 Q-8 28 -4 24Z" fill="${BONE}" stroke="${BST}" stroke-width="2.4"/>${[0, 8, 16, 24].map(x => `<path d="M${x} 32 l2 5 l2 -5" fill="#fff" stroke="${BST}" stroke-width="1.6"/>`).join('')}`,
+    neck: `${[0, 1, 2, 3, 4].map(i => { const t = i / 4, x = -28 + 56 * t, y = 10 - 20 * t - Math.sin(t * Math.PI) * 5, r = 8 - i * .5; return `<path d="M${x.toFixed(1)} ${(y - r).toFixed(1)} l2 -6" stroke="${BST}" stroke-width="2.6" stroke-linecap="round"/><ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${r + 1.5}" ry="${r}" fill="${BONE}" stroke="${BST}" stroke-width="2.2"/>`; }).join('')}`,
+    back: `${[...Array(6)].map((_, i) => { const x = -35 + i * 14; return `<path d="M${x} -2 L${x - 3} -19" stroke="${BST}" stroke-width="7" stroke-linecap="round"/><path d="M${x} -2 L${x - 3} -19" stroke="${BONE}" stroke-width="3.4" stroke-linecap="round"/><rect x="${x - 6.5}" y="-6" width="13" height="12" rx="4" fill="${BONE}" stroke="${BST}" stroke-width="2.2"/>`; }).join('')}`,
+    arm: `${[['M1 -24 L-4 -2'], ['M-4 -2 L5 14']].map(([d]) => `<path d="${d}" stroke="${BST}" stroke-width="10" stroke-linecap="round"/><path d="${d}" stroke="${BONE}" stroke-width="6" stroke-linecap="round"/>`).join('')}
+      <circle cx="1" cy="-25" r="5.5" fill="${BONE}" stroke="${BST}" stroke-width="2.2"/><circle cx="-4" cy="-2" r="5" fill="${BONE}" stroke="${BST}" stroke-width="2.2"/>
+      ${[-5, 0, 5].map(a => `<path d="M5 14 q${4 + a} 4 ${a * .8 + 2} 12" fill="none" stroke="${BST}" stroke-width="5.5" stroke-linecap="round"/><path d="M5 14 q${4 + a} 4 ${a * .8 + 2} 12" fill="none" stroke="${BONE}" stroke-width="2.4" stroke-linecap="round"/>`).join('')}`,
+    hip: `${['M-8 2 L-16 21', 'M8 2 L18 19'].map(d => `<path d="${d}" stroke="${BST}" stroke-width="10" stroke-linecap="round"/><path d="${d}" stroke="${BONE}" stroke-width="6" stroke-linecap="round"/>`).join('')}
+      <path d="M-28 -6 Q-26 -20 0 -20 Q26 -20 28 -6 Q20 5 0 5 Q-20 5 -28 -6Z" fill="${BONE}" stroke="${BST}" stroke-width="2.4" stroke-linejoin="round"/><circle cx="0" cy="-6" r="5.5" fill="${BST}"/>`,
     tail: `${[0, 1, 2, 3, 4, 5, 6].map(i => { const x = 34 - i * 12, y = -4 + i * i * .9, r = 8 - i * .8; return `<ellipse cx="${x}" cy="${y}" rx="${r + 1}" ry="${r}" fill="${BONE}" stroke="${BST}" stroke-width="2.2"/><path d="M${x} ${y - r} l0 -5" stroke="${BST}" stroke-width="2.4" stroke-linecap="round"/>`; }).join('')}`,
   };
   const ROCK = (rx, ry, col = '#efe6d2') => `<ellipse rx="${rx}" ry="${ry}" fill="${col}" stroke="#a8946e" stroke-width="2.4"/>`;
   const FOS = {
-    shell: { x: 72, y: 118, rx: 40, ry: 30, say: 'sc_fs_shell', art: `${ROCK(40, 30, '#efe3c8')}
+    shell: { x: 56, y: 102, rx: 36, ry: 26, say: 'sc_fs_shell', art: `${ROCK(36, 26, '#efe3c8')}
       <path d="${[...Array(60)].map((_, i) => { const t = i / 59 * Math.PI * 4.2, r = 1.5 + 1.75 * t; return (i ? 'L' : 'M') + (Math.cos(t) * r).toFixed(1) + ' ' + (Math.sin(t) * r * .9).toFixed(1); }).join(' ')}" fill="#e2cfa6" stroke="#8a6a3a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>` },
-    fern: { x: 330, y: 112, rx: 42, ry: 30, say: 'sc_fs_fern', art: `${ROCK(42, 30, '#e6dccb')}<path d="M-28 20 Q0 4 30 -22" fill="none" stroke="#5f7a4a" stroke-width="3" stroke-linecap="round"/>
+    fern: { x: 344, y: 98, rx: 38, ry: 27, say: 'sc_fs_fern', art: `${ROCK(38, 27, '#e6dccb')}<path d="M-28 20 Q0 4 30 -22" fill="none" stroke="#5f7a4a" stroke-width="3" stroke-linecap="round"/>
       ${[...Array(7)].map((_, i) => { const t = (i + 1) / 8, x = -28 + 58 * t, y = 20 - 42 * t + Math.sin(t * 3) * 2, s = 11 - i; return `<path d="M${x} ${y} q${-s * .3} ${-s} ${-s * .9} ${-s * 1.1}" fill="none" stroke="#6f8c55" stroke-width="2.6" stroke-linecap="round"/><path d="M${x} ${y} q${s} ${s * .2} ${s * 1.2} ${s * .7}" fill="none" stroke="#6f8c55" stroke-width="2.6" stroke-linecap="round"/>`; }).join('')}` },
-    skull: { x: 112, y: 214, rx: 54, ry: 32, bone: true, say: 'sc_fs_dino', art: `${ROCK(54, 32)}${BONES.skull}` },
-    ribs: { x: 236, y: 170, rx: 52, ry: 34, bone: true, art: `${ROCK(52, 34)}${BONES.ribs}` },
-    leg: { x: 340, y: 236, rx: 36, ry: 44, bone: true, art: `${ROCK(36, 44)}<g transform="translate(-6 -2)">${BONES.leg}</g>` },
-    tail: { x: 222, y: 262, rx: 54, ry: 28, bone: true, art: `${ROCK(54, 28)}${BONES.tail}` },
+    neck: { x: 196, y: 100, rx: 42, ry: 26, bone: true, art: `${ROCK(42, 26)}${BONES.neck}` },
+    skull: { x: 90, y: 160, rx: 46, ry: 28, bone: true, say: 'sc_fs_dino', art: `${ROCK(46, 28)}${BONES.skull}` },
+    ribs: { x: 220, y: 160, rx: 46, ry: 30, bone: true, art: `${ROCK(46, 30)}${BONES.ribs}` },
+    hip: { x: 330, y: 160, rx: 34, ry: 28, bone: true, art: `${ROCK(34, 28)}${BONES.hip}` },
+    arm: { x: 48, y: 228, rx: 26, ry: 32, bone: true, art: `${ROCK(26, 32)}${BONES.arm}` },
+    back: { x: 140, y: 228, rx: 46, ry: 24, bone: true, art: `${ROCK(46, 24)}<g transform="translate(0 6)">${BONES.back}</g>` },
+    leg: { x: 250, y: 238, rx: 32, ry: 42, bone: true, art: `${ROCK(32, 42)}<g transform="translate(-6 -2)">${BONES.leg}</g>` },
+    tail: { x: 348, y: 250, rx: 46, ry: 28, bone: true, art: `${ROCK(46, 28)}${BONES.tail}` },
   };
   const LAYER = [[60, '#e8c48a'], [104, '#d9a86a'], [160, '#c48a52'], [216, '#a8703e']];   // ground layers, top of each band
   const band = y => LAYER.reduce((col, [top, cl]) => y >= top ? cl : col, LAYER[0][1]);
@@ -8412,7 +8423,7 @@ function sciFossil(c) {
     ${LAYER.map(([top, col], i) => `<path d="M0 ${top + (i ? 4 : 0)} Q100 ${top - 6} 200 ${top + 2} T400 ${top} L400 300 L0 300Z" fill="${col}"/>`).join('')}
     <path d="M0 60 Q100 54 200 62 T400 60 L400 54 Q300 48 200 56 Q100 48 0 54Z" fill="#6cc46a"/>
     <g id="fsFos"></g><g id="fsDirt"></g><g id="fsFx"></g>
-    <g id="fsCount"><rect x="8" y="8" width="118" height="30" rx="15" fill="#fff" opacity=".85"/><text id="fsN" x="67" y="29" text-anchor="middle" class="sci-lbl">🦴 0 / 4 bones</text></g>
+    <g id="fsCount"><rect x="8" y="8" width="118" height="30" rx="15" fill="#fff" opacity=".85"/><text id="fsN" x="67" y="29" text-anchor="middle" class="sci-lbl">🦴 0 / 8 bones</text></g>
     <g id="fsBrush" opacity="0"><rect x="-4" y="-34" width="8" height="26" rx="3" fill="#c0623a" stroke="${O}" stroke-width="2"/><path d="M-9 -10 L9 -10 L11 6 L-11 6Z" fill="#ffe08a" stroke="${O}" stroke-width="2" stroke-linejoin="round"/></g>`;
   const fosG = c.$('#fsFos'), dirtG = c.$('#fsDirt'), fx = c.$('#fsFx'), brush = c.$('#fsBrush');
   const left = {}, total = {}, found = new Set(); let blobs = [], nBones = 0, saidBone = false, building = false;
@@ -8447,15 +8458,15 @@ function sciFossil(c) {
     blobs = blobs.filter(b => { if (b.k !== k) return true; b.e.classList.add('fs-gone'); setTimeout(() => b.e.remove(), 300); return false; });
     f.g.classList.add('fs-found'); Sound.fx.magic();
     for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, s = sciMk('circle', { cx: f.x + Math.cos(a) * (f.rx + 6), cy: f.y + Math.sin(a) * (f.ry + 4), r: 4, fill: '#fff6a0', class: 'fs-spark' }, fx); setTimeout(() => s.remove(), 900); }
-    if (f.bone) { nBones++; c.$('#fsN').textContent = `🦴 ${nBones} / 4 bones`; }
-    if (f.say) c.say(f.say); else if (!saidBone) { saidBone = true; c.say('sc_fs_bone'); }
+    if (f.bone) { nBones++; c.$('#fsN').textContent = `🦴 ${nBones} / 8 bones`; }
+    if (f.say) c.say(f.say); else if (!saidBone) { saidBone = true; c.say('sc_fs_bone'); } else if (f.bone && !Sound.talking) c.say('n_' + nBones);
     if (found.size === Object.keys(FOS).length) c.later(museum, 1500);
   }
   c.on(c.svg, 'pointerdown', e => { if (building) return; down = true; try { c.svg.setPointerCapture(e.pointerId); } catch (er) {} rub(c.pt(e)); });
   c.on(c.svg, 'pointermove', e => { if (down) rub(c.pt(e)); });
   const up = () => { down = false; brush.setAttribute('opacity', 0); };
   c.on(c.svg, 'pointerup', up); c.on(c.svg, 'pointercancel', up);
-  c.hand(72, 110);
+  c.hand(56, 102);
   c.intro(['sc_fs_1', 'sc_fs_2']);
   // ---- part 2: the museum. Put the dinosaur back together, bone by bone ----
   async function museum() {
@@ -8463,30 +8474,34 @@ function sciFossil(c) {
     // wait for Pip to finish talking about the last find
     for (let i = 0; i < 200 && Sound.talking; i++) await new Promise(r => setTimeout(r, 100));
     if (!c.svg.isConnected) return;
-    const SLOT = { skull: [306, 92, 0], ribs: [196, 128, 0], leg: [190, 196, 0], tail: [92, 112, 12] };   // where each bone goes (x, y, tilt)
-    const TRAY = { skull: [70, 262], ribs: [170, 262], leg: [262, 254], tail: [342, 262] };
-    c.svg.innerHTML = `<rect width="400" height="300" fill="#f3e9d8"/><rect y="236" width="400" height="64" fill="#c9a77a"/><rect y="232" width="400" height="6" fill="#a8845a"/>
-      <rect x="20" y="16" width="360" height="200" rx="14" fill="#fff8ea" stroke="#d8c2a0" stroke-width="3"/><text x="200" y="40" text-anchor="middle" class="sci-lbl">Dinosaur Museum</text>
-      <g opacity=".22" stroke="#6a5a40" stroke-width="2.6" stroke-dasharray="6 5" fill="none">
-        <path d="M60 104 Q90 98 140 118 Q200 108 250 116 Q290 100 330 92"/><ellipse cx="306" cy="92" rx="42" ry="24"/><ellipse cx="196" cy="128" rx="46" ry="30"/><path d="M180 160 L186 230 M214 156 L220 230"/></g>
-      <g id="fsSlots"></g><g id="fsPieces"></g><g id="fsFx2"></g>`;
-    const slots = c.$('#fsSlots'), pieces = c.$('#fsPieces'), fx2 = c.$('#fsFx2');
-    for (const [k, [x, y]] of Object.entries(SLOT)) sciMk('circle', { cx: x, cy: y, r: 12, fill: '#ffd23f', opacity: .55, class: 'fs-slot', 'data-k': k }, slots);
+    const SLOT = { tail: [62, 92, 12], hip: [124, 104, 0], back: [192, 84, 0], ribs: [192, 116, 0], leg: [146, 158, 0], arm: [244, 140, 0], neck: [266, 90, -25], skull: [318, 70, 0] };   // where each bone goes (x, y, tilt)
+    const ZORD = ['tail', 'hip', 'back', 'ribs', 'leg', 'arm', 'neck', 'skull'], PS = .85, TS = .6;
+    const keys = shuffle(Object.keys(SLOT)), TRAY = {}; keys.forEach((k, i) => { TRAY[k] = [56 + (i % 4) * 96, i < 4 ? 228 : 272]; });
+    c.svg.innerHTML = `<rect width="400" height="300" fill="#f3e9d8"/><rect y="204" width="400" height="96" fill="#c9a77a"/><rect y="200" width="400" height="6" fill="#a8845a"/>
+      <rect x="16" y="10" width="368" height="184" rx="14" fill="#fff8ea" stroke="#d8c2a0" stroke-width="3"/><text x="96" y="34" text-anchor="middle" class="sci-lbl">Dinosaur Museum</text>
+      <g id="fsSlots"></g><g id="fsPlaced"></g><g id="fsPieces"></g><g id="fsFx2"></g>`;
+    const slots = c.$('#fsSlots'), placedG = c.$('#fsPlaced'), pieces = c.$('#fsPieces'), fx2 = c.$('#fsFx2');
+    for (const k of ZORD) { const [x, y, t] = SLOT[k]; sciMk('g', { transform: `translate(${x} ${y}) rotate(${t}) scale(${PS})`, opacity: .16, 'data-g': k }, slots).innerHTML = BONES[k]; }
+    for (const [k, [x, y]] of Object.entries(SLOT)) sciMk('circle', { cx: x, cy: y, r: 7, fill: '#ffd23f', opacity: .7, class: 'fs-slot', 'data-k': k }, slots);
     let placed = 0;
-    for (const [k, [hx, hy]] of Object.entries(TRAY)) {
-      const g = sciMk('g', { style: 'cursor:grab' }, pieces); g.innerHTML = `<circle r="40" fill="transparent"/><g transform="scale(.8)">${BONES[k]}</g>`;
-      let x = hx, y = hy, done = false; const put = (sc = .8) => { g.firstElementChild.nextElementSibling.setAttribute('transform', `scale(${sc})`); g.setAttribute('transform', `translate(${x} ${y}) rotate(${done ? SLOT[k][2] : 0})`); }; put();
-      c.drag(g, { start: () => c.noHand(), move: ([nx, ny]) => { if (done) return; x = nx; y = ny; put(1); },
+    for (const k of keys) {
+      const [hx, hy] = TRAY[k];
+      const g = sciMk('g', { style: 'cursor:grab', 'data-b': k }, pieces); g.innerHTML = `<circle r="34" fill="transparent"/><g transform="scale(${TS})">${BONES[k]}</g>`;
+      let x = hx, y = hy, done = false; const put = (sc = TS) => { g.firstElementChild.nextElementSibling.setAttribute('transform', `scale(${sc})`); g.setAttribute('transform', `translate(${x} ${y}) rotate(${done ? SLOT[k][2] : 0})`); }; put();
+      c.drag(g, { start: () => { c.noHand(); if (!done) pieces.appendChild(g); }, move: ([nx, ny]) => { if (done) return; x = nx; y = ny; put(PS); },
         end: () => { if (done) return; const [sx, sy] = SLOT[k];
-          if (Math.hypot(x - sx, y - sy) < 52) { done = true; x = sx; y = sy; put(1); Sound.fx.snap(); placed++; slots.querySelector(`[data-k="${k}"]`)?.remove();
-            for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3, s = sciMk('circle', { cx: sx + Math.cos(a) * 34, cy: sy + Math.sin(a) * 24, r: 4, fill: '#ffd23f', class: 'fs-spark' }, fx2); setTimeout(() => s.remove(), 900); }
-            if (placed === 4) built(); }
+          if (Math.hypot(x - sx, y - sy) < 44) { done = true; x = sx; y = sy; put(PS); Sound.fx.snap(); placed++;
+            slots.querySelector(`[data-k="${k}"]`)?.remove(); slots.querySelector(`[data-g="${k}"]`)?.remove();
+            g.style.cursor = ''; g.firstElementChild.remove(); g.dataset.z = ZORD.indexOf(k);
+            const after = [...placedG.children].find(o => +o.dataset.z > +g.dataset.z); placedG.insertBefore(g, after || null);
+            for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3, s = sciMk('circle', { cx: sx + Math.cos(a) * 30, cy: sy + Math.sin(a) * 20, r: 4, fill: '#ffd23f', class: 'fs-spark' }, fx2); setTimeout(() => s.remove(), 900); }
+            if (placed === ZORD.length) built(); }
           else { x = hx; y = hy; put(); Sound.fx.wrong(); } } });
     }
-    c.hand(70, 262);
+    c.hand(...TRAY[keys[0]]);
     await c.say('sc_fs_build');
     async function built() {
-      Sound.fx.roar(); pieces.classList.add('fs-built');
+      Sound.fx.roar(); placedG.classList.add('fs-built');
       await c.say('sc_fs_built'); c.finish(['sc_fs_3']);
     }
   }
