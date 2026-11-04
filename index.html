@@ -967,7 +967,9 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .snav .snext { margin-left: auto; } .snav .sprev { margin-right: auto; }
 .snav .iconbtn { font: 800 22px/1 var(--f-display); color: var(--ink); }
 .snav .iconbtn:disabled { opacity: .35; }
-.snav .snext.nudge { background: var(--accent); color: #fff; box-shadow: 0 4px 0 #d45524; animation: a-pulse2 1.2s ease-in-out infinite; }
+.snav .snext { background: var(--good); color: #fff; box-shadow: 0 4px 0 #2e9d55; }
+.snav .snext:active { box-shadow: 0 1px 0 #2e9d55; }
+.snav .snext.nudge { animation: a-pulse2 1.2s ease-in-out infinite; }
 @keyframes a-pulse2 { 50% { transform: scale(1.1); } }
 .pdots { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
 .pdots i { width: 10px; height: 10px; border-radius: 50%; background: var(--card); box-shadow: inset 0 0 0 2px var(--edge); }
