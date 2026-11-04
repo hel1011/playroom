@@ -3576,11 +3576,12 @@ function storyGame(root, api) {
       `<span class="actor ${an ? 'a-' + an : ''}" style="left:${x}%;top:${y}%;--sz:${sz}">${e === 'PIP' ? pip() : (illFor(e) || e)}</span>`).join('')}</div>`;
   }
   let qTimers = [];
+  const live = sel => [...box.querySelectorAll(sel)].filter(e => !e.closest('.leaf'));   // skip the copy of the old page while it turns
   function stopQ() { qTimers.forEach(clearTimeout); qTimers = []; box.querySelectorAll('.qc.reading').forEach(c => c.classList.remove('reading')); box.querySelector('.qchoices')?.classList.remove('reading'); }
   function stopHL() { stopQ(); if (hl) { cancelAnimationFrame(hl); hl = null; } }
   // light up each answer card while Pip says it, so children who can't read yet know which picture is which
   function readChoices(p, id, dur) {
-    const row = box.querySelector('.qchoices'), cards = [...box.querySelectorAll('.qc')];
+    const row = live('.qchoices')[0], cards = live('.qc');
     if (!row || cards.length !== 3 || box.querySelector('.qc.yes')) return;
     const full = book.sprite?.clips?.[id]?.[1] || dur, k = dur / full;
     let ct = p.ct;
@@ -3596,7 +3597,7 @@ function storyGame(root, api) {
     stopHL();
     const qp = book && book.pages[pi];
     if (qp && qp.q && id === `${book.id}_${pi}` && box.dataset.clip === id) return readChoices(qp, id, dur);
-    const words = [...box.querySelectorAll('.stext:not(.q) .w')]; if (!words.length || box.dataset.clip !== id) return;
+    const words = live('.stext:not(.q) .w'); if (!words.length || box.dataset.clip !== id) return;
     // approximate read-along: spread the words over the clip, with small pauses after punctuation
     const wts = words.map(w => w.textContent.length + 1 + (/[.!?]["”]?$/.test(w.textContent) ? 5 : /[,;:]["”]?$/.test(w.textContent) ? 2.5 : 0));
     const total = wts.reduce((a, b) => a + b, 0); let acc = 0; const starts = wts.map(w => { const t = acc / total * dur; acc += w; return t; });
@@ -3684,7 +3685,7 @@ function storyGame(root, api) {
     const my = tok, id = `${book.id}_${pi}`;
     stopQ();
     if (k === p.ans) {
-      b.classList.add('yes'); Sound.fx.match(); box.querySelectorAll('.qc:not(.yes)').forEach(x => x.classList.add('fade'));
+      b.classList.add('yes'); Sound.fx.match(); live('.qc:not(.yes)').forEach(x => x.classList.add('fade'));
       box.querySelector('.snext').disabled = false;
       await Sound.say(id + '_yes', { silentCaption: true }); if (my !== tok) return;
       box.querySelector('.snext').classList.add('nudge');
