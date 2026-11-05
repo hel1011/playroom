@@ -1437,14 +1437,15 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .mr-load { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; font: 700 18px/1.3 var(--f-display); color: #8a5a2c; }
 .mr-count { position: absolute; left: 10px; top: 10px; background: #fff; border-radius: 16px; padding: 6px 12px; font: 800 20px/1 var(--f-display); box-shadow: 0 3px 0 var(--edge); }
 .mr-count.mr-pop { animation: plop .4s cubic-bezier(.3,1.6,.5,1); }
-.mr-tray { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 2px; scrollbar-width: none; position: relative; border-radius: 16px; transition: background .15s; }
+.mr-tray { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; padding: 4px 2px 2px; position: relative; border-radius: 16px; transition: background .15s; }   /* every piece in view, no scrolling */
 .mr-tray.bin { background: #ffd9d9; }
-.mr-piece { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 0; border-radius: 14px; background: var(--card); box-shadow: 0 4px 0 var(--edge); padding: 6px 8px 5px; cursor: grab; touch-action: none; font: 700 11px/1 var(--f-display); color: var(--ink); min-width: 62px; }
+.mr-piece { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border: 0; border-radius: 14px; background: var(--card); box-shadow: 0 4px 0 var(--edge); padding: 4px 2px 3px; cursor: grab; touch-action: none; font: 700 10px/1.05 var(--f-display); color: var(--ink); min-width: 0; text-align: center; }
+.mr-piece svg { width: 34px; height: 34px; }
 .mr-piece:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--edge); }
-.mr-bin { flex: 0 0 auto; display: grid; place-items: center; font-size: 26px; min-width: 50px; opacity: .45; }
+.mr-bin { display: grid; place-items: center; font-size: 24px; opacity: .45; }
 .mr-tray.bin .mr-bin { opacity: 1; animation: plop .3s; }
 .mr-btn.armed { background: #ff5a5a; color: #fff; }
-@media (orientation: landscape) and (max-height: 600px) { .mr { grid-template-rows: none; grid-template-columns: 1fr auto; } .mr-tray { flex-direction: column; overflow-y: auto; overflow-x: hidden; width: 86px; } .mr-piece { min-width: 0; } }
+@media (orientation: landscape) and (max-height: 600px) { .mr { grid-template-rows: none; grid-template-columns: 1fr auto; } .mr-tray { grid-template-columns: repeat(2, 54px); grid-auto-rows: minmax(0, 1fr); align-content: stretch; } .mr-piece span { display: none; } .mr-piece svg { width: 30px; height: 30px; } }
 .ci-z { font-size: 16px; animation: ciz 2.4s ease-in-out infinite; } .ci-z.z2 { animation-delay: -1.2s; font-size: 12px; } @keyframes ciz { 0% { opacity: 0; translate: 0 6px; } 40% { opacity: 1; } 100% { opacity: 0; translate: 6px -10px; } }
 .copour { animation: copour .65s ease-out; } @keyframes copour { from { stroke-dasharray: 1 200; } to { stroke-dasharray: 200 0; } }
 .coswirl { animation: coswirl .9s linear; transform-box: fill-box; transform-origin: center; } @keyframes coswirl { to { transform: rotate(720deg); } }
@@ -10452,7 +10453,7 @@ function loadThree() {
   THREE_P = add('js/three.min.js').catch(() => add('https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js')).catch(e => { THREE_P = null; throw e; });
   return THREE_P;
 }
-const MR_W = 7, MR_H = 10, MR_R = .21, MR_G = 150;   // board in cells; marble radius in cells; gravity in cells per second²
+const MR_W = 7, MR_H = 10, MR_R = .21, MR_G = 55, MR_VMAX = 16;   // board in cells; marble radius in cells; gravity in cells per second² (slowed down so children can follow a marble); top speed
 // each piece: footprint (w x h cells), colour, and its shape in its own cells (x right, y up from the bottom-left corner)
 const MR_PIECES = {
   ramp: { w: 2, h: 1, col: '#ff5a4e', name: 'Ramp', segs: [[[0, .74], [2, .30]], [[.03, .74], [.03, 1]]] },
@@ -10467,7 +10468,7 @@ const MR_PIECES = {
 };
 const MR_TRAY = ['ramp', 'long', 'turn', 'funnel', 'bumper', 'tramp', 'bell', 'spinner'];
 // a starter run, so the first marble already has somewhere fun to go
-const MR_START = [['long', 0, 8, 0], ['turn', 3, 7, 0], ['long', 1, 6, 1], ['turn', 0, 5, 1], ['ramp', 1, 4, 0], ['funnel', 3, 1, 0], ['cup', 3, 0, 0], ['bumper', 5, 5, 0], ['bell', 5, 8, 0]];
+const MR_START = [['cup', 3, 0, 0]];   // an empty wall with just the cup at the bottom: the child builds the run
 const MARBLE_COLS = ['#ff4d4d', '#4ab3ff', '#3fc58a', '#ffd23f', '#b27cff', '#ff9f1c', '#ff6fb5', '#2fd0d8'];
 
 function marbleGame(root, api) {
@@ -10478,8 +10479,8 @@ function marbleGame(root, api) {
   const cleanups = [];
   // tools in the game bar: drop, party, clear
   const mkBtn = (html, label, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip mr-btn'; b.innerHTML = html; b.setAttribute('aria-label', label); b.addEventListener('click', fn); tools.appendChild(b); return b; };
-  let placed = (store.get('pr-marble', null) || MR_START).map(([k, x, y, f]) => ({ k, x, y, f: !!f }));
-  const save = () => store.set('pr-marble', placed.map(p => [p.k, p.x, p.y, p.f ? 1 : 0]));
+  let placed = (store.get('pr-marble2', null) || MR_START).map(([k, x, y, f]) => ({ k, x, y, f: !!f }));
+  const save = () => store.set('pr-marble2', placed.map(p => [p.k, p.x, p.y, p.f ? 1 : 0]));
   let marbles = [], dropX = 1.2, colI = 0, inCup = 0, won = false, said = {}, clearArm = 0;
   const cupP = () => placed.find(p => p.k === 'cup');
   // ---------- physics shapes for the placed pieces (board cells, y up) ----------
@@ -10506,9 +10507,9 @@ function marbleGame(root, api) {
     nx /= d; ny /= d; m.x = px + nx * MR_R; m.y = py + ny * MR_R;
     const rvx = m.vx - vx0, rvy = m.vy - vy0, vn = rvx * nx + rvy * ny;
     if (vn < 0) {
-      const ee = Math.abs(vn) < 3 ? 0 : e;    // slow touches don't bounce: the marble settles and rolls
+      const ee = Math.abs(vn) < 2.5 ? 0 : e * .8;    // slow touches don't bounce: the marble settles and rolls
       m.vx -= (1 + ee) * vn * nx; m.vy -= (1 + ee) * vn * ny;
-      if (-vn > 4) hits.push({ sh, v: -vn, m });
+      if (-vn > 2.5) hits.push({ sh, v: -vn, m });
     }
     m.cn = [nx, ny]; return [px, py, nx, ny, vn];
   }
@@ -10517,9 +10518,9 @@ function marbleGame(root, api) {
       if (m.done) continue;
       m.vy -= MR_G * dt;
       // rolling, not sliding: a solid ball on a slope only gets 5/7 of the pull along the slope
-      if (m.cn && m.cn[1] > .2) { const [nx, ny] = m.cn, tx = -ny, ty = nx, gt = (-MR_G) * ty; m.vx -= (2 / 7) * gt * tx * dt; m.vy -= (2 / 7) * gt * ty * dt; const k = 1 - .18 * dt; m.vx *= k; m.vy = m.vy * k; }
+      if (m.cn && m.cn[1] > .2) { const [nx, ny] = m.cn, tx = -ny, ty = nx, gt = (-MR_G) * ty; m.vx -= (2 / 7) * gt * tx * dt; m.vy -= (2 / 7) * gt * ty * dt; const k = 1 - .45 * dt; m.vx *= k; m.vy = m.vy * k; }
       m.cn = null;
-      const sp = Math.hypot(m.vx, m.vy); if (sp > 60) { m.vx *= 60 / sp; m.vy *= 60 / sp; }
+      const sp = Math.hypot(m.vx, m.vy); if (sp > MR_VMAX) { m.vx *= MR_VMAX / sp; m.vy *= MR_VMAX / sp; }
       m.x += m.vx * dt; m.y += m.vy * dt;
       for (const s of shapes) {
         if (s.t === 's') collide(m, s.a[0], s.a[1], s.b[0], s.b[1], s.e, s);
@@ -10527,7 +10528,7 @@ function marbleGame(root, api) {
           const dx = m.x - s.c[0], dy = m.y - s.c[1], d = Math.hypot(dx, dy), R = s.r + MR_R;
           if (d < R && d > 1e-9) {
             const nx = dx / d, ny = dy / d; m.x = s.c[0] + nx * R; m.y = s.c[1] + ny * R; const vn = m.vx * nx + m.vy * ny;
-            if (vn < 0) { const e = s.p && s.p.k === 'bumper' ? 1.3 : s.e; m.vx -= (1 + e) * vn * nx; m.vy -= (1 + e) * vn * ny; if (s.p && s.p.k === 'bumper') { m.vx += nx * 8; m.vy += ny * 8; } if (-vn > 3 || (s.p && s.p.k === 'bumper')) hits.push({ sh: s, v: -vn, m }); }
+            if (vn < 0) { const e = s.p && s.p.k === 'bumper' ? 1.1 : s.e; m.vx -= (1 + e) * vn * nx; m.vy -= (1 + e) * vn * ny; if (s.p && s.p.k === 'bumper') { m.vx += nx * 3; m.vy += ny * 3; } if (-vn > 2 || (s.p && s.p.k === 'bumper')) hits.push({ sh: s, v: -vn, m }); }
             m.cn = [nx, ny];
           }
         } else if (s.t === 'w') {   // the spinner's four paddles turn when a marble pushes them
@@ -10560,13 +10561,13 @@ function marbleGame(root, api) {
   function sounds() {
     const now = performance.now();
     for (const h of hits.splice(0)) {
-      const p = h.sh.p, v = Math.min(1, h.v / 30);
+      const p = h.sh.p, v = Math.min(1, h.v / 12);
       if (p && p.k === 'bell') { if (!p.ring || now - p.ring > 180) { p.ring = now; Sound.fx.ding(p.x); p.swing = 1; if (!said.bell) { said.bell = true; } } }
       else if (p && p.k === 'bumper') { if (!p.hit || now - p.hit > 120) { p.hit = now; Sound.fx.boing(); } }
       else if (p && p.k === 'tramp') { if (!p.hit || now - p.hit > 150) { p.hit = now; p.bounce = 1; Sound.fx.boing(); } }
       else if (now - lastClack > 35) { lastClack = now; Sound.fx.clack(v, h.sh.marble); }
     }
-    let roll = 0; for (const m of marbles) if (!m.done && m.cn) roll = Math.max(roll, Math.min(1, Math.hypot(m.vx, m.vy) / 25));
+    let roll = 0; for (const m of marbles) if (!m.done && m.cn) roll = Math.max(roll, Math.min(1, Math.hypot(m.vx, m.vy) / 10));
     Sound.fx.roll(roll);
   }
   // ---------- drop marbles ----------
@@ -10588,8 +10589,8 @@ function marbleGame(root, api) {
     for (const m of marbles) {
       if (m.done) continue; m.age += dt;
       const sp = Math.hypot(m.vx, m.vy); m.idle = sp < .8 ? m.idle + dt : 0;
-      if (cp && m.x > cp.x + .3 && m.x < cp.x + 1.7 && m.y > cp.y && m.y < cp.y + .9 && sp < 6) { m.done = 'cup'; m.doneT = t; cupHit(); }
-      else if (m.y < -1.2 || m.idle > 5 || m.age > 60) { m.done = 'gone'; m.doneT = t; }
+      if (cp && m.x > cp.x + .3 && m.x < cp.x + 1.7 && m.y > cp.y && m.y < cp.y + .9 && sp < 4) { m.done = 'cup'; m.doneT = t; cupHit(); }
+      else if (m.y < -1.2 || m.idle > 6 || m.age > 90) { m.done = 'gone'; m.doneT = t; }
     }
     marbles = marbles.filter(m => !m.done || t - m.doneT < 700);
     if (T) T.draw(t, dt);
@@ -10803,7 +10804,6 @@ function marbleGame(root, api) {
     if (now - clearArm > 3000) { clearArm = now; clr.classList.add('armed'); clr.innerHTML = '🧹 Tap again'; setTimeout(() => { clr.classList.remove('armed'); clr.innerHTML = '🧹 Clear'; }, 3000); return; }
     clearArm = 0; clr.classList.remove('armed'); clr.innerHTML = '🧹 Clear'; placed = placed.filter(p => p.k === 'cup'); marbles.forEach(m => { if (!m.done) { m.done = 'gone'; m.doneT = performance.now(); } }); Sound.fx.whoosh(); afterChange();
   });
-  mkBtn('↺ Starter', 'Put back the starter run', () => { placed = MR_START.map(([k, x, y, f]) => ({ k, x, y, f: !!f })); Sound.fx.magic(); afterChange(); });
   window.__mr = () => ({ marbles, placed, shapes });   // for testing
   // hold Pip's speech bubble at the height of his longest line here, so the wall doesn't jump each time he talks
   const bub = document.querySelector('#game .gamebar .caption');
