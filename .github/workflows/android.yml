@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['app/**', 'index.html', 'audio/**', '.github/workflows/android.yml']
+    paths: ['app/**', 'index.html', 'audio/**', 'js/**', '.github/workflows/android.yml']
 concurrency: { group: android, cancel-in-progress: true }
 permissions:
   contents: write

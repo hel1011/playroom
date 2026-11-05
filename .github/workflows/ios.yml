@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['app/**', 'index.html', 'audio/**', '.github/workflows/ios.yml']
+    paths: ['app/**', 'index.html', 'audio/**', 'js/**', '.github/workflows/ios.yml']
 concurrency: { group: ios, cancel-in-progress: true }
 jobs:
   build:
