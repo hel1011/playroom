@@ -1435,7 +1435,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .pt-rail { position: relative; } .pt-track { height: 8px; background: repeating-linear-gradient(90deg, #8a5a2c 0 10px, #b98552 10px 22px); border-radius: 4px; margin-top: -2px; }
 .pt-train { display: flex; align-items: flex-end; gap: 4px; justify-content: center; }
 .pt-train.arrive { animation: pt-in 1.1s cubic-bezier(.2,.8,.3,1); } .pt-train.leave { animation: pt-out 1.4s ease-in forwards; }
-@keyframes pt-in { from { transform: translateX(-110vw); } } @keyframes pt-out { to { transform: translateX(120vw); } }
+@keyframes pt-in { from { transform: translateX(110vw); } } @keyframes pt-out { to { transform: translateX(-120vw); } }   /* the engine faces left, so the train drives right-to-left: in from the right, out to the left */
 .pt-eng { width: clamp(52px, 14vw, 76px); flex: 0 0 auto; }
 .pt-car { position: relative; width: clamp(40px, 11vw, 64px); aspect-ratio: 1.05; background: #ffd23f; border: 2.6px solid #3a3340; border-radius: 8px; display: grid; place-items: center; flex: 0 0 auto; }
 .pt-car::before, .pt-car::after { content: ""; position: absolute; bottom: -9px; width: 12px; height: 12px; border-radius: 50%; background: #3a3340; } .pt-car::before { left: 5px; } .pt-car::after { right: 5px; }
