@@ -10622,7 +10622,7 @@ Object.assign(MR_PIECES, {
   pillar3: { w: 1, h: 3, col: '#8d96a0', name: 'Pillar', solid: [[.22, .02, .78, 2.98]], segs: MR_BOX(.22, .02, .78, 2.98), e: .3 },
 });
 // levels: the marble always drops from the same spot, the cup is fixed, and stones, planks and pillars are in the way.
-// Every level was checked by building a run that solves it and dropping marbles through it.
+// Every level was checked by building a run that solves it and dropping marbles through it; 9 to 12 were also checked to need more than two pieces.
 const MR_LEVELS = [
   { drop: 1.2, cup: 5, rocks: [] },
   { drop: 5.8, cup: 0, rocks: [['pillar3', 3, 0]] },
@@ -10630,6 +10630,13 @@ const MR_LEVELS = [
   { drop: 1.0, cup: 5, rocks: [['pillar3', 3, 0], ['pillar3', 3, 3]] },
   { drop: 0.6, cup: 0, rocks: [['plank3', 0, 6], ['plank3', 4, 3]] },
   { drop: 6.2, cup: 3, rocks: [['plank3', 4, 6], ['stone', 1, 3], ['stone', 0, 6]] },
+  // 7 to 12 get harder: more in the way, and longer runs that need more pieces (2, 2, 3, 3, 4, then 5)
+  { drop: 0.6, cup: 0, rocks: [['stone', 0, 5], ['stone', 1, 5], ['stone', 2, 5], ['stone', 5, 5], ['stone', 6, 5], ['pillar3', 2, 0]] },
+  { drop: 0.6, cup: 0, rocks: [['plank3', 0, 6], ['pillar3', 3, 0]] },
+  { drop: 3.5, cup: 5, rocks: [['stone', 3, 8], ['pillar3', 4, 0], ['plank3', 4, 5]] },
+  { drop: 0.6, cup: 3, rocks: [['plank3', 0, 7], ['plank3', 3, 7], ['plank3', 1, 4], ['plank3', 4, 4]] },
+  { drop: 6.4, cup: 0, rocks: [['plank3', 1, 7], ['plank3', 4, 7], ['plank3', 0, 4], ['plank3', 3, 4], ['stone', 2, 0]] },
+  { drop: 6.4, cup: 3, rocks: [['plank3', 1, 8], ['plank3', 4, 8], ['plank3', 0, 5], ['plank2', 3, 5], ['stone', 5, 5], ['plank3', 1, 2], ['plank3', 4, 2]] },
 ];
 const MR_GOAL = { build: 10, levels: 5 };   // marbles in the cup for a star
 const MR_TRAY = ['ramp', 'long', 'turn', 'funnel', 'bumper', 'tramp', 'bell', 'spinner'];
@@ -10893,9 +10900,12 @@ function marbleGame(root, api) {
     function fit() {
       const r = stage.getBoundingClientRect(); if (r.width < 10 || r.height < 10) return;
       renderer.setSize(r.width, r.height, false); cam.aspect = r.width / r.height;
-      const bw = MR_W + 1.6, bh = MR_H + 2.6, vf = 30 * Math.PI / 180;
-      const dist = Math.max(bh / 2 / Math.tan(vf / 2), bw / 2 / (Math.tan(vf / 2) * cam.aspect)) * 1.02;
-      const cx = MR_W / 2, cy = MR_H / 2 + .4;
+      const bw = MR_W + 1.6, bh = MR_H + 2.6, vf = 30 * Math.PI / 180, tn = Math.tan(vf / 2);
+      // keep a band clear at the top for the score and level badges, so they never cover the dropper
+      const d0 = Math.max(bh / 2 / tn, bw / 2 / (tn * cam.aspect)), side = (r.width - r.width * bw / (2 * d0 * tn * cam.aspect)) / 2;
+      const pad = side > 170 ? 0 : Math.min(r.height * .18, 54);   // only when the badges would sit over the wall (upright)
+      const dist = Math.max(bh / 2 / tn * r.height / (r.height - pad), bw / 2 / (tn * cam.aspect)) * 1.02;
+      const cx = MR_W / 2, cy = MR_H / 2 + .4 + pad / 2 * (2 * dist * tn) / r.height;
       cam.position.set(cx + dist * .16, cy + dist * .05, dist); cam.lookAt(cx, cy, 0); cam.updateProjectionMatrix();
     }
     fit();
