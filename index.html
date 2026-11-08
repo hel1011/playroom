@@ -11680,7 +11680,7 @@ function wordBingo(root, api) {
   const modes = { pic: store.get('pr-sb-mode-pic', 'pw'), sight: store.get('pr-sb-mode-sight', 'look') }, kind = () => SB_SETS[set].k;
   let mode = modes[kind()];
   const done = new Set(store.get('pr-sb-done2', []));
-  let drawn = [], card = [], marked = new Set([SB_MID]), pending = [], lines = new Set(), busy = false, misses = 0, idleT = 0, idleN = 0, alive = true, ink = 0, spins = SB_SPINS, coins = 0, over = false, score = 0, jp = 0, best = store.get('pr-sb-best', 0);
+  let drawn = [], card = [], marked = new Set([SB_MID]), pending = [], lines = new Set(), busy = false, misses = 0, idleT = 0, idleN = 0, alive = true, ink = 0, spins = SB_SPINS, coins = 0, over = false, score = 0, jp = 0, best = store.get('pr-sb-best', 0), reading = false, busyAt = 0;
   const told = {}; const once = id => { if (told[id]) return false; told[id] = true; return true; };
   const timers = new Set(), later = (f, ms) => { const t = setTimeout(() => { timers.delete(t); if (alive) f(); }, ms); timers.add(t); return t; };
   // ---------- top: word set and how words are called ----------
@@ -11772,6 +11772,7 @@ function wordBingo(root, api) {
   // ---------- spinning ----------
   async function spin() {
     if (busy || over) return;
+    if (reading) { Sound.fx.boing(); return; }   // Pip is still reading this spin
     if (pending.some(p => !p.done && p.on)) { nudge(); return; }
     if (marked.size >= SB_N || spins <= 0) return;
     busy = true; spins--; stat(); clearTimeout(idleT); lever.classList.remove('nudge', 'pull'); void lever.offsetWidth; lever.classList.add('pull'); box.classList.add('spinning');
@@ -11780,10 +11781,22 @@ function wordBingo(root, api) {
     reels.forEach(r => { r.className = 'sb-reel spin'; const all = shuffle([...SB_SETS[set].words.map(w => mode === 'pw' ? SB_PIC[w] : w), '⭐', '🪙', '🎁']).slice(0, 8); r.querySelector('.sb-strip').innerHTML = [...all, all[0]].map(w => `<div class="sb-w">${w}</div>`).join(''); });
     for (let i = 0; i < SB_REELS; i++) { await wait(i ? 420 : 900); if (!alive) { clearInterval(tick); return; } reels[i].className = 'sb-reel stop'; drawReel(i); Sound.fx.ding(i); }
     clearInterval(tick); box.classList.remove('spinning');
-    for (const p of pending) { if (!alive) return; reels[p.r].classList.add('read'); await reveal(p); reels[p.r].classList.remove('read'); drawReel(p.r); }
-    if (coins >= SB_JAR) { coins -= SB_JAR; stat(); await (Math.random() < .5 ? bonusRound() : chestRound()); }
+    // the card can be tapped as soon as the reels stop; Pip reads them out while the child looks.
+    // Only specials that change the card themselves (gift boxes, rainbow, rocket, bonus games) hold taps for a moment.
+    busy = false; reading = true; misses = 0; idleN = 0;
+    for (const p of pending) {
+      if (!alive) return;
+      const holds = ['gift', 'rainbow', 'rocket'].includes(p.t);
+      if (holds) busy = true;
+      reels[p.r].classList.add('read');
+      try { await reveal(p); } catch (e) {}
+      reels[p.r].classList.remove('read'); drawReel(p.r);
+      if (holds) busy = false;
+      if (over) { reading = false; return; }
+    }
+    if (coins >= SB_JAR) { coins -= SB_JAR; stat(); busy = true; try { await (Math.random() < .5 ? bonusRound() : chestRound()); } catch (e) {} busy = false; }
     if (spins === 1) await Sound.say('sb_last');
-    busy = false; misses = 0; idleN = 0; afterMove();
+    reading = false; afterMove();
   }
   async function reveal(p) {
     if (p.t === 'coin') { p.done = true; flyCoin(reels[p.r]); coins = Math.min(SB_JAR, coins + 1); later(stat, 600); Sound.fx.ding(5); if (once('coin')) await Sound.say('sb_coin'); else await wait(500); return; }
@@ -11817,6 +11830,7 @@ function wordBingo(root, api) {
     const c = card[i]; idleN = 0;
     let p = pending.find(q => !q.done && q.on && q.w === c.w);
     if (!p) p = pending.find(q => !q.done && q.t === 'star');
+    if (!p && reading && pending.some(q => !q.done && q.on)) { el.classList.remove('no'); void el.offsetWidth; el.classList.add('no'); Sound.fx.boing(); return; }
     if (!p) {   // not one of the called words: say what this square says, then what to look for
       el.classList.remove('no'); void el.offsetWidth; el.classList.add('no'); Sound.fx.wrong(); misses++;
       const want = pending.find(q => !q.done && q.on && q.w);
@@ -11832,7 +11846,7 @@ function wordBingo(root, api) {
     Sound.fx.pop(); later(() => Sound.fx.splash(), 90); addPts(10, el); spark(el); jp++; later(stat, 650);
     if (jp === SB_JP - 1) later(() => Sound.say('sb_almost'), 900); else if (jp === Math.ceil(SB_JP * .75) - 1 && once('close')) later(() => Sound.say('sb_close'), 900);
     const found = newLines();
-    if (found.length) { busy = true; celebrate(found, c).then(r => { busy = false; if (r !== 'full') afterMove(); }); return; }
+    if (found.length) { celebrate(found, c).then(r => { if (r !== 'full') afterMove(); }); return; }   // the card stays tappable during the celebration
     Sound.say(Math.random() < .5 ? [sbId(c.w)] : [sbId(c.w), pick(['sb_good1', 'sb_good2', 'sb_good3'])]);   // see it and hear it together
     afterMove();
   }
@@ -11844,7 +11858,7 @@ function wordBingo(root, api) {
     for (let s = 0; s < 8; s++) { const sp = document.createElement('span'); sp.className = 'sb-spark'; sp.style.setProperty('--a', (s * 45 + rnd(20)) + 'deg'); sp.textContent = pick(['✦', '★', '✧']); el.appendChild(sp); later(() => sp.remove(), 900); }
   }
   function afterMove() {
-    if (marked.size >= SB_N || over) return;
+    if (marked.size >= SB_N || over || reading) return;
     if (jp >= SB_JP && !busy) { busy = true; clearTimeout(idleT); jackpotHit().then(() => { jp = 0; stat(); return prizeWheel(); }).then(() => { busy = false; afterMove(); }); return; }   // jackpot!
     if (!pending.some(p => !p.done && p.on)) {
       if (spins <= 0) return endCard();
@@ -11922,7 +11936,7 @@ function wordBingo(root, api) {
     const targets = shuffle([...Array(SB_N).keys()].filter(j => !marked.has(j))).slice(0, 3); let last = null;
     for (const j of targets) {
       const r = grid.children[j].getBoundingClientRect(), tx = r.left - o.left + r.width / 2, ty = r.top - o.top + r.height / 2, ang = Math.atan2(ty - py, tx - px) * 180 / Math.PI + 45;
-      await rk.animate([{ transform: `translate(${px}px, ${py}px) translate(-50%, -50%) rotate(${ang}deg) scale(1)` }, { transform: `translate(${(px + tx) / 2}px, ${Math.min(py, ty) - 50}px) translate(-50%, -50%) rotate(${ang}deg) scale(1.5)` }, { transform: `translate(${tx}px, ${ty}px) translate(-50%, -50%) rotate(${ang}deg) scale(1)` }], { duration: 650, easing: 'ease-in-out', fill: 'forwards' }).finished;
+      await new Promise(done => { const an = rk.animate([{ transform: `translate(${px}px, ${py}px) translate(-50%, -50%) rotate(${ang}deg) scale(1)` }, { transform: `translate(${(px + tx) / 2}px, ${Math.min(py, ty) - 50}px) translate(-50%, -50%) rotate(${ang}deg) scale(1.5)` }, { transform: `translate(${tx}px, ${ty}px) translate(-50%, -50%) rotate(${ang}deg) scale(1)` }], { duration: 650, easing: 'ease-in-out', fill: 'forwards' }); an.onfinish = an.oncancel = done; setTimeout(done, 1200); });
       Sound.fx.popper(); px = tx; py = ty; last = await autoStamp(j);
     }
     rk.remove(); await afterAuto(last);
@@ -12006,7 +12020,8 @@ function wordBingo(root, api) {
     });
   }
   newBtn.addEventListener('click', () => { Sound.fx.tap(); newCard(); });
-  window.__sb = () => ({ card, pending, marked: [...marked], set, mode, busy, spins, coins, over, tap: i => tapSq(i, grid.children[i]), spin, bonus: () => bonusRound(), score, jp, wheel: () => { busy = true; return prizeWheel().then(() => { busy = false; afterMove(); }); }, hit: () => { jp = SB_JP; stat(); afterMove(); }, setJp: n => { jp = n; stat(); }, chest: () => chestRound(), rainbow: () => rainbowLine(), rocket: () => rocketGo(lever) });   // for testing
+  const guard = setInterval(() => { if (!alive) return clearInterval(guard); if (busy && bonusEl.hidden && !box.classList.contains('spinning') && !box.querySelector('.sb-jpfx')) { busyAt = busyAt || Date.now(); if (Date.now() - busyAt > 15000) { busy = false; reading = false; busyAt = 0; afterMove(); } } else busyAt = 0; }, 1000);
+  window.__sb = () => ({ card, pending, marked: [...marked], set, mode, busy, reading, spins, coins, over, tap: i => tapSq(i, grid.children[i]), spin, bonus: () => bonusRound(), score, jp, wheel: () => { busy = true; return prizeWheel().then(() => { busy = false; afterMove(); }); }, hit: () => { jp = SB_JP; stat(); afterMove(); }, setJp: n => { jp = n; stat(); }, chest: () => chestRound(), rainbow: () => rainbowLine(), rocket: () => rocketGo(lever) });   // for testing
   newCard();
   api.intro(['sb_intro2', howLine()].filter(Boolean));
   return () => { alive = false; clearTimeout(idleT); timers.forEach(clearTimeout); lro.disconnect(); };
