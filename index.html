@@ -1462,12 +1462,15 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .mr-piece { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border: 0; border-radius: 14px; background: var(--card); box-shadow: 0 4px 0 var(--edge); padding: 4px 2px 3px; cursor: grab; touch-action: none; font: 700 10px/1.05 var(--f-display); color: var(--ink); min-width: 0; text-align: center; }
 .mr-piece svg { width: 34px; height: 34px; }
 .mr-piece:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--edge); }
-.mr-bin { display: grid; place-items: center; font-size: 24px; opacity: .45; }
-.mr-tray.bin .mr-bin { opacity: 1; animation: plop .3s; }
+.mr-bin { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border: 0; border-radius: 14px; background: #fff0f0; box-shadow: 0 4px 0 #f2c4c4; padding: 4px 2px 3px; cursor: pointer; font: 700 10px/1.05 var(--f-display); color: #b33a3a; min-width: 0; }
+.mr-bin b { font-size: 24px; line-height: 34px; }
+.mr-bin:active { transform: translateY(2px); box-shadow: 0 2px 0 #f2c4c4; }
+.mr-bin.armed { background: #ff5a5a; color: #fff; box-shadow: 0 4px 0 #c43c3c; animation: shake .4s; }
+.mr-tray.bin .mr-bin { background: #ff5a5a; color: #fff; animation: plop .3s; }
 .mr-btn.armed { background: #ff5a5a; color: #fff; }
 .mr-lvl { position: absolute; right: 10px; top: 10px; display: flex; align-items: center; gap: 6px; background: #fff; border-radius: 16px; padding: 4px 6px; box-shadow: 0 3px 0 var(--edge); font: 800 18px/1 var(--f-display); } .mr-lvl[hidden] { display: none; }
 .mr-lvl button { border: 0; background: #eef3fa; border-radius: 12px; width: 34px; height: 30px; font-size: 15px; cursor: pointer; } .mr-lvl button:disabled { opacity: .4; }
-@media (orientation: landscape) and (max-height: 600px) { .mr { grid-template-rows: none; grid-template-columns: 1fr auto; } .mr-tray { grid-template-columns: repeat(2, 54px); grid-auto-rows: minmax(0, 1fr); align-content: stretch; } .mr-piece span { display: none; } .mr-piece svg { width: 30px; height: 30px; } }
+@media (orientation: landscape) and (max-height: 600px) { .mr { grid-template-rows: none; grid-template-columns: 1fr auto; } .mr-tray { grid-template-columns: repeat(2, 54px); grid-auto-rows: minmax(0, 1fr); align-content: stretch; } .mr-piece span { display: none; } .mr-piece svg { width: 30px; height: 30px; } .mr-bin { grid-column: span 2; flex-direction: row; gap: 6px; font-size: 12px; } .mr-bin b { font-size: 20px; line-height: 1; } }
 .ci-z { font-size: 16px; animation: ciz 2.4s ease-in-out infinite; } .ci-z.z2 { animation-delay: -1.2s; font-size: 12px; } @keyframes ciz { 0% { opacity: 0; translate: 0 6px; } 40% { opacity: 1; } 100% { opacity: 0; translate: 6px -10px; } }
 .copour { animation: copour .65s ease-out; } @keyframes copour { from { stroke-dasharray: 1 200; } to { stroke-dasharray: 200 0; } }
 .coswirl { animation: coswirl .9s linear; transform-box: fill-box; transform-origin: center; } @keyframes coswirl { to { transform: rotate(720deg); } }
@@ -10955,7 +10958,7 @@ function marbleGame(root, api) {
       spinner: `<g transform="translate(24 24)">${[0, 1, 2, 3].map(i => `<rect x="0" y="-2.5" width="17" height="5" rx="2" fill="${c}" stroke="${O}" stroke-width="1.5" transform="rotate(${i * 90 + 20})"/>`).join('')}<circle r="4" fill="#fff" stroke="${O}" stroke-width="2"/></g>` }[k];
     return `<svg viewBox="0 0 48 48" width="40" height="40" aria-hidden="true">${body}</svg>`;
   }
-  tray.innerHTML = MR_TRAY.map(k => `<button type="button" class="mr-piece" data-k="${k}" role="listitem" aria-label="${MR_PIECES[k].name}">${trayIcon(k)}<span>${MR_PIECES[k].name}</span></button>`).join('') + `<div class="mr-bin" aria-hidden="true">🗑️</div>`;
+  tray.innerHTML = MR_TRAY.map(k => `<button type="button" class="mr-piece" data-k="${k}" role="listitem" aria-label="${MR_PIECES[k].name}">${trayIcon(k)}<span>${MR_PIECES[k].name}</span></button>`).join('') + `<button type="button" class="mr-bin" aria-label="Clear all pieces"><b>🗑️</b><span>Clear all</span></button>`;
   const overTray = (x, y) => { const r = tray.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; };
   function startDrag(e, piece, k) {
     if (!T) return; e.preventDefault();
@@ -11009,10 +11012,14 @@ function marbleGame(root, api) {
   // ---------- buttons ----------
   mkBtn('⚪ Drop', 'Drop a marble', () => drop(dropX + (Math.random() - .5) * .1));
   mkBtn('🎉 Party', 'Drop lots of marbles', () => { for (let i = 0; i < 10; i++) setTimeout(() => alive && drop(dropX + (Math.random() - .5) * 1.2), i * 160); if (!said.party) { said.party = true; Sound.say('mr_party'); } });
-  const clr = mkBtn('🧹 Clear', 'Clear the wall', () => {
+  // the trash can in the tray clears every piece at once (tap twice, so one stray tap can't wipe a run); the cup and locked blocks stay
+  const clr = tray.querySelector('.mr-bin'), binLab = clr.querySelector('span'); let armT = 0;
+  const disarm = () => { clearArm = 0; clearTimeout(armT); clr.classList.remove('armed'); binLab.textContent = 'Clear all'; };
+  clr.addEventListener('click', () => {
+    if (!placed.some(p => p.k !== 'cup' && !p.lock)) { Sound.fx.boing(); return; }   // nothing to clear
     const now = performance.now();
-    if (now - clearArm > 3000) { clearArm = now; clr.classList.add('armed'); clr.innerHTML = '🧹 Tap again'; setTimeout(() => { clr.classList.remove('armed'); clr.innerHTML = '🧹 Clear'; }, 3000); return; }
-    clearArm = 0; clr.classList.remove('armed'); clr.innerHTML = '🧹 Clear'; placed = placed.filter(p => p.k === 'cup' || p.lock); marbles.forEach(m => { if (!m.done) { m.done = 'gone'; m.doneT = performance.now(); } }); Sound.fx.whoosh(); afterChange();
+    if (now - clearArm > 3000) { clearArm = now; clr.classList.add('armed'); binLab.textContent = 'Tap again'; Sound.fx.tap(); clearTimeout(armT); armT = setTimeout(disarm, 3000); return; }
+    disarm(); placed = placed.filter(p => p.k === 'cup' || p.lock); marbles.forEach(m => { if (!m.done) { m.done = 'gone'; m.doneT = performance.now(); } }); Sound.fx.whoosh(); afterChange();
   });
   window.__mr = () => ({ marbles, placed, shapes });   // for testing
   // hold Pip's speech bubble at the height of his longest line here, so the wall doesn't jump each time he talks
