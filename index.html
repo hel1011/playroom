@@ -1475,10 +1475,11 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .bb-stage { position: relative; min-height: 0; border-radius: 20px; overflow: hidden; background: radial-gradient(ellipse at 60% 70%, #f4f9ff, #cfe0f3); }
 .bb-cv { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 .bb-load { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; font: 700 18px/1.3 var(--f-display); color: #2c5a8c; }
-.bb-book { position: absolute; background: #fffdf6; border: 3px solid #fff; border-radius: 16px; box-shadow: 0 3px 0 var(--edge); pointer-events: none; }
+.bb-book { position: absolute; border: 3px solid #fff; border-radius: 16px; box-shadow: 0 3px 0 var(--edge); pointer-events: none; }
 .bb-hd { position: absolute; left: 0; right: 0; top: 0; height: 27px; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 8px; background: #fff; border-radius: 12px 12px 0 0; font: 800 15px/1 var(--f-display); color: var(--ink); }
-.bb-call { display: flex; align-items: center; gap: 4px; font: 800 14px/1 var(--f-display); } .bb-call svg { width: auto; height: 22px; }
-.bb-goal { position: absolute; right: 5px; bottom: 5px; width: 90px; height: 90px; background: #fff; border-radius: 12px; box-shadow: 0 2px 0 var(--edge), 0 0 0 2px #ffd21f inset; display: grid; place-items: center; overflow: hidden; }
+.bb-call { display: flex; align-items: center; gap: 4px; font: 800 14px/1 var(--f-display); margin-left: auto; } .bb-call svg { width: auto; height: 22px; }
+.bb-pickb { pointer-events: auto; border: 0; border-radius: 10px; background: #eaf3ff; box-shadow: 0 2px 0 var(--edge); padding: 3px 7px; font: 800 12px/1.2 var(--f-display); color: var(--ink); cursor: pointer; }
+.bb-goal { position: absolute; right: 5px; bottom: 5px; width: 90px; height: 90px; padding: 0; border: 0; cursor: pointer; pointer-events: auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 0 var(--edge), 0 0 0 2px #ffd21f inset; display: grid; place-items: center; overflow: hidden; }
 .bb-goal img { width: 100%; height: 100%; object-fit: contain; } .bb-goal span { position: absolute; left: 0; right: 0; bottom: 3px; text-align: center; font: 800 11px/1 var(--f-display); color: #a07800; }
 .bb-float { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
 .bb-float button { display: flex; flex-direction: column; align-items: center; gap: 1px; border: 0; border-radius: 14px; background: #fff; box-shadow: 0 4px 0 var(--edge); padding: 6px 8px 5px; font: 800 19px/1 var(--f-display); cursor: pointer; color: var(--ink); min-width: 46px; }
@@ -1494,18 +1495,18 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .bb-card b { font-size: 15px; } .bb-card span { font-size: 12px; opacity: .7; } .bb-card.on { box-shadow: 0 0 0 3px #1e6fd9, 0 4px 0 var(--edge); }
 .bb-tray { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
 .bb-shapes { display: grid; grid-template-columns: repeat(auto-fit, minmax(62px, 1fr)); gap: 6px; padding: 4px 2px 2px; }
-.bb.free .bb-shapes { grid-auto-flow: column; grid-template-columns: none; grid-template-rows: repeat(2, 62px); grid-auto-columns: 62px; overflow-x: auto; overscroll-behavior: contain; padding-bottom: 6px; }
+.bb-shapes { grid-auto-flow: column; grid-template-columns: none; grid-template-rows: repeat(2, 58px); grid-auto-columns: 64px; overflow-x: auto; overscroll-behavior: contain; padding-bottom: 6px; }
 .bb-cols { display: flex; gap: 6px; overflow-x: auto; padding: 3px 2px; flex: none; }
 .bb-col { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 3px solid #fff; background: var(--c); box-shadow: 0 2px 0 var(--edge); cursor: pointer; }
 .bb-col[data-c="glass"] { background: linear-gradient(135deg, #e4f7ff 40%, #a9e4ff 41% 59%, #e4f7ff 60%); }
 .bb-col.on { box-shadow: 0 0 0 3px #1e6fd9; transform: scale(1.1); }
-.bb-piece { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; border-radius: 14px; background: var(--card); box-shadow: 0 4px 0 var(--edge); padding: 5px 2px 4px; cursor: grab; touch-action: none; font: 800 11px/1 var(--f-display); color: var(--ink); min-width: 0; min-height: 56px; }
+.bb-piece { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; border-radius: 14px; background: var(--card); box-shadow: 0 4px 0 var(--edge); padding: 5px 2px 4px; cursor: grab; touch-action: pan-x; font: 800 11px/1 var(--f-display); color: var(--ink); min-width: 0; }
 .bb-piece svg { max-width: 100%; height: auto; max-height: 32px; }
 .bb-piece.on { background: #e3f0ff; box-shadow: 0 0 0 3px #1e6fd9, 0 4px 0 var(--edge); }
 @media (orientation: landscape) and (max-height: 600px) {
   .bb { grid-template-rows: none; grid-template-columns: 1fr auto; } .bb-tray { width: 138px; }
   .bb-shapes { grid-template-columns: repeat(2, 1fr); grid-auto-rows: minmax(40px, 1fr); align-content: stretch; flex: 1; overflow-y: auto; min-height: 0; } .bb-piece { min-height: 0; padding: 3px 2px; } .bb-piece svg { max-height: 26px; } .bb-piece span { display: none; }
-  .bb.free .bb-shapes { grid-auto-flow: row; grid-template-rows: none; grid-auto-columns: auto; grid-template-columns: repeat(2, 1fr); grid-auto-rows: 52px; overflow-y: auto; overflow-x: hidden; }
+  .bb-shapes, .bb.free .bb-shapes { grid-auto-flow: row; grid-template-rows: none; grid-auto-columns: auto; grid-template-columns: repeat(2, 1fr); grid-auto-rows: 52px; overflow-y: auto; overflow-x: hidden; }
   .bb-cols { flex-wrap: wrap; overflow: visible; } .bb-col { width: 26px; height: 26px; }
 }
 .ci-z { font-size: 16px; animation: ciz 2.4s ease-in-out infinite; } .ci-z.z2 { animation-delay: -1.2s; font-size: 12px; } @keyframes ciz { 0% { opacity: 0; translate: 0 6px; } 40% { opacity: 1; } 100% { opacity: 0; translate: 6px -10px; } }
@@ -11161,7 +11162,7 @@ const bbLabel = p => p.k === 'b' || p.k === 'p' ? `${Math.min(p.a, p.b)}×${Math
 function blockGame(root, api) {
   const wrap = document.createElement('div'); wrap.className = 'bb'; root.appendChild(wrap);
   wrap.innerHTML = `<div class="bb-stage"><canvas class="bb-cv"></canvas>
-    <div class="bb-book"><div class="bb-hd"><b class="bb-stepn"></b><span class="bb-call"></span></div><div class="bb-goal"><img alt=""><span>Goal</span></div></div>
+    <div class="bb-book"><div class="bb-hd"><b class="bb-stepn"></b><span class="bb-call"></span><button type="button" class="bb-pickb" aria-label="Pick something else to build">🖼️ Pick</button></div><button type="button" class="bb-goal" aria-label="Goal: what you are building. Tap to pick something else"><img alt=""><span>Goal</span></button></div>
     <div class="bb-float"><button type="button" class="bb-undo" aria-label="Undo">↩️<span>Undo</span></button><button type="button" class="bb-erase" aria-label="Take blocks off">🧽<span>Take off</span></button><button type="button" class="bb-clear" aria-label="Clear everything">🗑️<span>Clear</span></button><button type="button" class="bb-turn" aria-label="Turn the block">🔄<span>Turn</span></button></div>
     <button type="button" class="bb-next" hidden></button><div class="bb-load">Getting the blocks out…</div>
     <div class="bb-pick" hidden><div class="bb-pick-in"><b class="bb-pick-t">What do you want to build?</b><div class="bb-cards"></div></div></div></div>
@@ -11216,9 +11217,10 @@ function blockGame(root, api) {
   });
   const saveFree = () => store.set('pr-bb-free', free);
   // ---------- modes and models ----------
-  chips('Play', [['steps', 'Follow steps'], ['free', 'Free build']], play, v => { play = v; store.set('pr-bb-play', v); load(); Sound.say(v === 'free' ? 'bb_free' : 'bb_' + M().id); });
+  const playChips = chips('Play', [['steps', '📖 Steps'], ['free', '🧱 Free build']], play, v => { play = v; store.set('pr-bb-play', v); load(); Sound.say(v === 'free' ? 'bb_free' : 'bb_' + M().id); });
   const helpChips = chips('Help', [['help', 'Helper'], ['expert', 'Expert']], help, v => { help = v; store.set('pr-bb-mode', v); load(); Sound.say(v === 'help' ? 'bb_helper' : 'bb_expert'); });
-  const pickBtn = document.createElement('button'); pickBtn.type = 'button'; pickBtn.className = 'chip mr-btn'; pickBtn.innerHTML = '🖼️ Pick a build'; pickBtn.addEventListener('click', () => openPicker()); document.getElementById('tools').appendChild(pickBtn);
+  playChips.style.flexBasis = helpChips.style.flexBasis = 'auto';   // both sets of buttons share one row
+  $('.bb-pickb').addEventListener('click', () => openPicker()); $('.bb-goal').addEventListener('click', () => openPicker());
   function openPicker() {
     if (play !== 'steps') return;
     $('.bb-cards').innerHTML = BB_MODELS.map((m, i) => `<button type="button" class="bb-card${i === mi ? ' on' : ''}" data-i="${i}">${thumbs[m.id] ? `<img src="${thumbs[m.id]}" alt="">` : `<i>${m.icon}</i>`}<b>${m.name}${doneSet.has(m.id) ? ' ✓' : ''}</b><span>${m.steps.length} steps</span></button>`).join('');
@@ -11231,7 +11233,7 @@ function blockGame(root, api) {
     si = Math.min(progress[M().id] || 0, M().steps.length); if (si >= M().steps.length) si = 0;
     const f = play === 'free';
     wrap.classList.toggle('free', f); book.hidden = f; [undoBtn, eraseBtn, clearBtn].forEach(b => b.hidden = !f);
-    helpChips.style.display = f ? 'none' : ''; pickBtn.style.display = f ? 'none' : '';
+    helpChips.style.display = f ? 'none' : '';
     goalImg.src = thumbs[M().id] || ''; goalImg.parentNode.hidden = !thumbs[M().id];
     drawTray(); stepUi(); if (T) { T.fit(); T.rebuild(true); }
   }
@@ -11370,7 +11372,7 @@ function blockGame(root, api) {
     const ghostM = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: .45, depthWrite: false });
     const prevMats = {}, prevMat = c => prevMats[c] || (prevMats[c] = new THREE.MeshPhysicalMaterial({ color: BB_COL[c], transparent: true, opacity: .6, roughness: .4, depthWrite: false }));
     const hiM = new THREE.MeshBasicMaterial({ color: '#ffcf33', transparent: true, opacity: .5, side: THREE.BackSide, depthWrite: false });
-    let ghost = null, preview = null, arrow = null, hi = null, newB = null, bounces = [], lastPop = null, anim = null, puffs = [];
+    let ghost = null, preview = null, arrow = null, hi = null, newB = null, bounces = [], lastPop = null, anim = null, puffs = [], demoT0 = 0;
     const heights = () => { const h = {}; A.built.children.forEach(g => { const p = g.userData.p, [w, d] = bbFoot(p), top = p.y + BB_KH[p.k]; for (let i = 0; i < w; i++) for (let j = 0; j < d; j++) h[(p.x + i) + ',' + (p.z + j)] = Math.max(h[(p.x + i) + ',' + (p.z + j)] || 0, top); }); return h; };
     const stackAt = (x, z, w, d) => { const h = heights(); let m = 0; for (let i = 0; i < w; i++) for (let j = 0; j < d; j++) m = Math.max(m, h[(x + i) + ',' + (z + j)] || 0); return m; };
     function rebuild() {
@@ -11381,17 +11383,18 @@ function blockGame(root, api) {
       for (let i = 0; i < upto; i++) { A.built.add(piece(st[i])); B.built.add(piece(st[i])); }
       if (finished || !st[si]) return;
       // the instruction picture: the new piece sits still where it goes, glowing, with an arrow pointing at it
-      newB = piece(st[si]); B.built.add(newB);
-      hi = piece(st[si], hiM); hi.scale.set(1.12, 1.08, 1.12); hi.position.y -= .03; B.built.add(hi);
+      newB = piece(st[si]); newB.userData.y0 = newB.position.y; B.built.add(newB);
+      hi = piece(st[si], hiM); hi.scale.set(1.12, 1.08, 1.12); hi.position.y -= .03; hi.userData.y0 = hi.position.y; B.built.add(hi); demoT0 = performance.now();
       arrow = new THREE.Mesh(geo('arrow', () => new THREE.ConeGeometry(.32, .7, 18).rotateX(Math.PI)), new THREE.MeshBasicMaterial({ color: '#ff3b30' })); B.scene.add(arrow);
       const [w, d] = bbFoot(st[si]); arrow.position.set(st[si].x + w / 2, (st[si].y + BB_KH[st[si].k]) * BB_U + 1.1, st[si].z + d / 2); arrow.userData.y = arrow.position.y;
       if (help === 'help') { ghost = piece(st[si], ghostM); ghost.traverse(o => { o.castShadow = false; }); const e = new THREE.LineSegments(new THREE.EdgesGeometry(ghost.userData.main.geometry, 30), new THREE.LineBasicMaterial({ color: '#1e6fd9' })); e.position.copy(ghost.userData.main.position); ghost.children[0].add(e); A.scene.add(ghost); }
     }
     function popLast() { const g = A.built.children[A.built.children.length - 1]; if (g) { g.userData.pop = 1; lastPop = g; } }
+    // frame a box (x0..x1, z0..z1, 0..top) so it fills the view: its height and width are fitted separately
     function fitCam(c, r, top, n, b, a, e, zm) {
       c.aspect = r.w / r.h; const f = c.fov * Math.PI / 180, hf = 2 * Math.atan(Math.tan(f / 2) * c.aspect);
-      const cx = b ? (b[0] + b[1]) / 2 : n / 2, cz = b ? (b[2] + b[3]) / 2 : n / 2, R = b ? Math.hypot((b[1] - b[0]) / 2 + .5, (b[3] - b[2]) / 2 + .5, top * .55) + .2 : Math.hypot(n * .54, top * .45);
-      const dist = R / Math.sin(Math.min(f, hf) / 2) * (zm || 1), cy = top * (b ? .42 : .25);
+      const [x0, x1, z0, z1] = b || [0, n, 0, n], cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, diag = Math.hypot(x1 - x0, z1 - z0);
+      const vert = top * Math.cos(e) + diag * Math.sin(e), dist = (Math.max(vert / 2 / Math.tan(f / 2), diag / 2 / Math.tan(hf / 2)) + diag * .35) * (zm || 1), cy = top * .45;
       c.position.set(cx + dist * Math.cos(e) * Math.sin(a), cy + dist * Math.sin(e), cz + dist * Math.cos(e) * Math.cos(a)); c.lookAt(cx, cy, cz); c.updateProjectionMatrix();
     }
     const topOf = () => play === 'free' ? Math.max(4, ...free.map(p => (p.y + BB_KH[p.k]) * BB_U)) : Math.max(3, ...steps().map(p => (p.y + BB_KH[p.k]) * BB_U));
@@ -11400,11 +11403,12 @@ function blockGame(root, api) {
       const r = stage.getBoundingClientRect(); if (r.width < 10 || r.height < 10) return; W = r.width; H = r.height;
       renderer.setSize(W, H, false);
       if (play === 'free') { rMain = { x: 0, y: 0, w: W, h: H }; return; }
-      if (H > W * 1.1) { const bh = Math.round(Math.min(H * .36, W * .68)); rBook = { x: 8, y: 8, w: W - 16, h: bh }; rMain = { x: 0, y: bh + 12, w: W, h: H - bh - 12 }; }
+      const portrait = innerHeight >= innerWidth;   // upright phone: the steps picture is always on top
+      if (portrait) { const bh = Math.round(Math.max(130, Math.min(H * .4, W * .62))); rBook = { x: 8, y: 8, w: W - 16, h: bh }; rMain = { x: 0, y: bh + 12, w: W, h: H - bh - 12 }; }
       else { const bw = Math.round(Math.min(W * .4, H * .95)); rBook = { x: 8, y: 8, w: bw, h: H - 16 }; rMain = { x: bw + 12, y: 0, w: W - bw - 12, h: H }; }
       Object.assign(book.style, { left: rBook.x + 'px', top: rBook.y + 'px', width: rBook.w + 'px', height: rBook.h + 'px' });
       // the goal picture gets its own corner, and the step picture uses the rest (they never overlap)
-      const gl = book.querySelector('.bb-goal'), up = H > W * 1.1, inner = rBook.h - 33;
+      const gl = book.querySelector('.bb-goal'), up = portrait, inner = rBook.h - 33;
       const gs = Math.round(up ? Math.min(inner - 8, rBook.w * .34) : Math.min(rBook.w * .5, inner * .38));
       Object.assign(gl.style, { width: gs + 'px', height: gs + 'px', right: '5px', bottom: (up ? Math.round((inner - gs) / 2) : 5) + 'px' });
       rPic = up ? { x: rBook.x + 3, y: rBook.y + 30, w: rBook.w - gs - 14, h: inner } : { x: rBook.x + 3, y: rBook.y + 30, w: rBook.w - 6, h: inner - gs - 8 };
@@ -11457,7 +11461,7 @@ function blockGame(root, api) {
       for (const m of BB_MODELS) {
         C.setN(m.n); C.built.clear(); const st = m.steps.map(bbPiece); st.forEach(p => C.built.add(piece(p)));
         const top = Math.max(3, ...st.map(p => (p.y + BB_KH[p.k]) * BB_U)), b = [Math.min(...st.map(p => p.x)), Math.max(...st.map(p => p.x + bbFoot(p)[0])), Math.min(...st.map(p => p.z)), Math.max(...st.map(p => p.z + bbFoot(p)[1]))];
-        fitCam(tc, { w: 1, h: 1 }, top, m.n, b, Math.PI - .6, .5, .95);
+        fitCam(tc, { w: 1, h: 1 }, top, m.n, b, Math.PI - .6, .5, .9);
         renderer.setScissor(0, H - S, S, S); renderer.setViewport(0, H - S, S, S); renderer.setClearColor('#000000', 0); renderer.clear(); renderer.render(C.scene, tc);
         ctx.clearRect(0, 0, 256, 256); ctx.drawImage(cv, 0, 0, S * pr, S * pr, 0, 0, 256, 256); thumbs[m.id] = cnv.toDataURL('image/png');
       }
@@ -11465,9 +11469,13 @@ function blockGame(root, api) {
     }
     function draw(t, dt) {
       if (Math.abs(azGoal - az) > .001) az += (azGoal - az) * Math.min(1, dt * 8);
-      const top = topOf(), n = N(); fitCam(cam, rMain, top, n, null, az, el, zoom);
-      if (play === 'steps') fitCam(bcam, rPic, top, n, bounds(), az, .62, .86);
+      const top = topOf(), n = N(); if (play === 'steps') { const bd = bounds(); fitCam(cam, rMain, top, n, [Math.max(0, bd[0] - 1.5), Math.min(n, bd[1] + 1.5), Math.max(0, bd[2] - 1.5), Math.min(n, bd[3] + 1.5)], az, el, zoom); } else fitCam(cam, rMain, top, n, null, az, el, zoom);
+      if (play === 'steps') fitCam(bcam, rPic, top, n, bounds(), az, .62, .95);
       if (ghost) ghost.children[0].children[0].material.opacity = .28 + .2 * Math.sin(t / 260);
+      if (newB) {   // the move, shown again and again: the block comes down from above into its spot (2.4 s: drop, then rest)
+        const ph = ((performance.now() - demoT0) / 2400) % 1, k = Math.min(1, ph / .32), drop = (1 - k) * (1 - k) * 2.6, bump = k === 1 && ph < .38 ? Math.sin((ph - .32) / .06 * Math.PI) * .06 : 0;
+        newB.position.y = newB.userData.y0 + drop + bump; hi.position.y = hi.userData.y0 + drop + bump; hi.visible = k === 1;
+      }
       if (hi) hiM.opacity = .35 + .3 * Math.sin(t / 220); if (arrow) arrow.position.y = arrow.userData.y + Math.sin(t / 260) * .15;
       if (lastPop && lastPop.userData.pop) { lastPop.userData.pop = Math.max(0, lastPop.userData.pop - dt * 4); const s = 1 + Math.sin(lastPop.userData.pop * Math.PI) * .12; lastPop.scale.set(s, s, s); }
       bounces = bounces.filter(g => { g.userData.t += dt; const k = g.userData.t; g.position.y += (3.5 - 18 * k) * dt; g.position.x += g.userData.vx * dt; g.rotation.z += dt * 4; if (g.userData.fm) g.userData.fm.opacity = Math.max(0, 1 - k * 1.6); if (k > .7) { A.scene.remove(g); if (g.userData.fm) g.userData.fm.dispose(); return false; } return true; });
@@ -11475,7 +11483,8 @@ function blockGame(root, api) {
       animate(dt);
       renderer.setClearColor('#000000', 0); renderer.setScissor(0, 0, W, H); renderer.setViewport(0, 0, W, H); renderer.clear();
       renderer.setScissor(rMain.x, H - rMain.y - rMain.h, rMain.w, rMain.h); renderer.setViewport(rMain.x, H - rMain.y - rMain.h, rMain.w, rMain.h); renderer.render(A.scene, cam);
-      if (play === 'steps') { const { x: bx, y: by, w: bw, h: bh } = rPic;
+      if (play === 'steps') { renderer.setScissor(rBook.x + 3, H - rBook.y - rBook.h + 3, rBook.w - 6, rBook.h - 6); renderer.setClearColor('#fffdf6', 1); renderer.clear();   // the whole card, so no gaps
+        const { x: bx, y: by, w: bw, h: bh } = rPic;
         renderer.setScissor(bx, H - by - bh, bw, bh); renderer.setViewport(bx, H - by - bh, bw, bh); renderer.setClearColor('#fffdf6', 1); renderer.clear(); renderer.render(B.scene, bcam); }
     }
     fit(); rebuild();
