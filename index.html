@@ -1485,7 +1485,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .bb-float button { display: flex; flex-direction: column; align-items: center; gap: 1px; border: 0; border-radius: 14px; background: #fff; box-shadow: 0 4px 0 var(--edge); padding: 6px 8px 5px; font: 800 19px/1 var(--f-display); cursor: pointer; color: var(--ink); min-width: 46px; }
 .bb-float button span { font-size: 10px; } .bb-float button:disabled { opacity: .45; } .bb-float button:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--edge); }
 .bb-float button.on { background: #ffe9a8; box-shadow: 0 0 0 3px #f5b400, 0 4px 0 var(--edge); } .bb-float button.armed { background: #ff5a5a; color: #fff; animation: shake .4s; }
-.bb-next { position: absolute; border: 0; border-radius: 22px; background: var(--good); color: #fff; box-shadow: 0 5px 0 #2e9d55; padding: 14px 22px; font: 800 22px/1 var(--f-display); cursor: pointer; animation: plop .5s cubic-bezier(.3,1.6,.5,1); white-space: nowrap; }
+.bb-next { position: absolute; border: 0; border-radius: 20px; background: var(--good); color: #fff; box-shadow: 0 5px 0 #2e9d55; padding: 12px 16px; font: 800 19px/1 var(--f-display); cursor: pointer; animation: plop .5s cubic-bezier(.3,1.6,.5,1); white-space: nowrap; }
 .bb-pick { position: absolute; inset: 0; z-index: 5; background: rgba(30,50,80,.35); display: grid; place-items: center; padding: 10px; }
 .bb-pick-in { background: #fff; border-radius: 20px; padding: 12px; max-height: 100%; overflow-y: auto; width: min(560px, 100%); box-shadow: 0 6px 0 var(--edge); }
 .bb-pick-t { display: block; text-align: center; font: 800 20px/1.2 var(--f-display); margin: 2px 0 10px; color: var(--ink); }
@@ -11163,7 +11163,7 @@ function blockGame(root, api) {
   const wrap = document.createElement('div'); wrap.className = 'bb'; root.appendChild(wrap);
   wrap.innerHTML = `<div class="bb-stage"><canvas class="bb-cv"></canvas>
     <div class="bb-book"><div class="bb-hd"><b class="bb-stepn"></b><span class="bb-call"></span><button type="button" class="bb-pickb" aria-label="Pick something else to build">🖼️ Pick</button></div><button type="button" class="bb-goal" aria-label="Goal: what you are building. Tap to pick something else"><img alt=""><span>Goal</span></button></div>
-    <div class="bb-float"><button type="button" class="bb-undo" aria-label="Undo">↩️<span>Undo</span></button><button type="button" class="bb-erase" aria-label="Take blocks off">🧽<span>Take off</span></button><button type="button" class="bb-clear" aria-label="Clear everything">🗑️<span>Clear</span></button><button type="button" class="bb-turn" aria-label="Turn the block">🔄<span>Turn</span></button></div>
+    <div class="bb-float"><button type="button" class="bb-undo" aria-label="Undo">↩️<span>Undo</span></button><button type="button" class="bb-erase" aria-label="Take blocks off">🧽<span>Take off</span></button><button type="button" class="bb-clear" aria-label="Clear everything">🗑️<span>Clear</span></button><button type="button" class="bb-turn" aria-label="Turn the block">🔄<span>Turn</span></button><button type="button" class="bb-view" aria-label="Spin the board around">🎥<span>Spin</span></button></div>
     <button type="button" class="bb-next" hidden></button><div class="bb-load">Getting the blocks out…</div>
     <div class="bb-pick" hidden><div class="bb-pick-in"><b class="bb-pick-t">What do you want to build?</b><div class="bb-cards"></div></div></div></div>
     <div class="bb-tray"><div class="bb-cols" hidden></div><div class="bb-shapes" role="list"></div></div>`;
@@ -11206,6 +11206,7 @@ function blockGame(root, api) {
     if (T) T.showPreview(null);
   }
   turnBtn.addEventListener('click', () => { if (!sel || bbTurns(sel) < 2) { Sound.fx.boing(); return; } sel.r = (sel.r + (bbTurns(sel) === 2 && sel.k !== 's' ? 1 : 1)) % bbTurns(sel); Sound.fx.snap(); if (T && T.lastCell) T.showPreview(T.lastCell); });
+  $('.bb-view').addEventListener('click', () => { if (!T) return; T.spinTo(T.az - Math.PI / 2); Sound.fx.whoosh(); });   // a quarter turn around the model, smoothly
   const setErase = on => { erasing = on; eraseBtn.classList.toggle('on', on); if (on) { sel = null; markSel(); } };
   eraseBtn.addEventListener('click', () => { setErase(!erasing); Sound.fx.tap(); if (erasing) say('bb_erase'); });
   undoBtn.addEventListener('click', () => { if (!free.length) { Sound.fx.boing(); return; } free.pop(); saveFree(); Sound.fx.whoosh(); T && T.rebuild(true); });
@@ -11412,7 +11413,7 @@ function blockGame(root, api) {
       const gs = Math.round(up ? Math.min(inner - 8, rBook.w * .34) : Math.min(rBook.w * .5, inner * .38));
       Object.assign(gl.style, { width: gs + 'px', height: gs + 'px', right: '5px', bottom: (up ? Math.round((inner - gs) / 2) : 5) + 'px' });
       rPic = up ? { x: rBook.x + 3, y: rBook.y + 30, w: rBook.w - gs - 14, h: inner } : { x: rBook.x + 3, y: rBook.y + 30, w: rBook.w - 6, h: inner - gs - 8 };
-      const nb = nextBtn.style; nb.left = (rMain.x + (rMain.w - 120) / 2) + 'px'; nb.top = (rMain.y + rMain.h - 66) + 'px';
+      const nb = nextBtn.style; nb.left = (rMain.x + 10) + 'px'; nb.top = (rMain.y + rMain.h - 64) + 'px';   // bottom-left, clear of the Turn and Spin buttons
     }
     const ray = new THREE.Raycaster(), v2 = new THREE.Vector2();
     function inMain(cx, cy) { const r = cv.getBoundingClientRect(), x = cx - r.left, y = cy - r.top; return x >= rMain.x && x <= rMain.x + rMain.w && y >= rMain.y && y <= rMain.y + rMain.h; }
@@ -11491,7 +11492,7 @@ function blockGame(root, api) {
     try { makeThumbs(); } catch (er) {}
     return { fit, draw, rebuild, popLast, hover, showPreview, bounce, inMain, eraseAt, stackAt, celebrate, lastCell: null,
       proj(x, y, z) { const v = new THREE.Vector3(x, y, z).project(cam), r = cv.getBoundingClientRect(); return [r.left + rMain.x + (v.x + 1) / 2 * rMain.w, r.top + rMain.y + (1 - v.y) / 2 * rMain.h]; },
-      get az() { return azGoal; }, setAz(a) { az = azGoal = a; }, get zoom() { return zoom; }, setZoom(z) { zoom = Math.max(.4, Math.min(1.7, z)); }, get el() { return el; }, setEl(e) { el = Math.max(.2, Math.min(1.3, e)); },
+      get az() { return azGoal; }, setAz(a) { az = azGoal = a; }, spinTo(a) { azGoal = a; }, get zoom() { return zoom; }, setZoom(z) { zoom = Math.max(.4, Math.min(1.7, z)); }, get el() { return el; }, setEl(e) { el = Math.max(.2, Math.min(1.3, e)); },
       dispose() { renderer.dispose(); pm.dispose(); env.dispose(); } };
   }
   // ---------- start ----------
