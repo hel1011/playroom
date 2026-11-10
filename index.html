@@ -6754,6 +6754,10 @@ function arcBricks(a) {
   let bonus = null, missT = 0, comboSaid = 0, saidCandy = false, saidTrash = false, touched = false, t = 0;
   const show = () => a.score(`🎈 ${score}`);
   // notices (combos, power-ups, levels) are a small label along the top edge of the game, so they never cover the play
+  // Pip's feelings while he drives: each one shows on his face, and the kart moves to match
+  let mood = { m: 'idle', t: 0 }, blinkT = 2.5, hop = 0, hopV = 0, crestA = 0, crestV = 0, puffs = [], puffT = 0;
+  const MOOD_RANK = { idle: 0, worry: 1, boing: 2, cheer: 3, wow: 3, yuck: 3, sad: 4 };
+  function feel(m, dur) { if (mood.t > 0 && MOOD_RANK[m] < MOOD_RANK[mood.m]) return; mood = { m, t: dur }; if (m === 'cheer' || m === 'wow') hopV = -190; if (m === 'boing') hopV = Math.min(hopV, -60); }
   let toast = null; const note = (txt, ms = 1300) => { toast = { txt, t: 0, dur: ms / 1000 }; };
   const save = () => a.save({ level, score, kartC });
   const grav = () => (bonus ? 300 : 470 + Math.min(4, Math.floor(level / 6)) * 28 + Math.floor(level / 30) * 30) * (on.floaty > 0 ? .45 : 1);
@@ -6793,13 +6797,14 @@ function arcBricks(a) {
     if (b.kind === 'trash') { drops.push({ kind: 'trash', x: b.x, y: b.y, vx: 0, vy: -40, ic: ['🥾', '🦴', '🥫'][Math.floor(Math.random() * 3)] }); if (!saidTrash) { saidTrash = true; a.say('ar_bal_trash'); } }
     if (b.kind === 'paint') drops.push({ kind: 'paint', x: b.x, y: b.y, vx: 0, vy: -40, ic: '🪣', c: BAL_KART[(kartC + 1 + Math.floor(Math.random() * (BAL_KART.length - 1))) % BAL_KART.length] });
     if (b.kind === 'gift') { const ks = Object.keys(BAL_POWERS); drops.push({ kind: 'gift', x: b.x, y: b.y, vx: 0, vy: -50, k: ks[Math.floor(Math.random() * ks.length)] }); }
+    if (combo >= 3) feel('cheer', .9);
     if (combo === 3) note('Combo! ✨', 900); if (combo >= 5 && combo % 5 === 0) { note(`Super combo × ${combo}! 🌟`, 1200); if (t - comboSaid > 20) { comboSaid = t; a.say('ar_bal_combo'); } }
     // zappy boots: each pop zaps the nearest balloon too
     if (on.zap > 0 && !viaZap) { let n = null, nd = 120; for (const o of balloons) if (o.alive && o !== b) { const d = Math.hypot(o.x - b.x, o.y - b.y); if (d < nd) { nd = d; n = o; } } if (n) { zaps.push({ x0: b.x, y0: b.y, x1: n.x, y1: n.y, t: 0 }); a.fx.beep && a.fx.beep(); setTimeout(() => pop(n, true), 90); } }
     show();
   }
   function power(k) {
-    const P = BAL_POWERS[k]; on[k] = P.t; a.fx.magic(); note(`${P.ic} ${P.name}!`, 1400); a.say('ar_bal_' + k);
+    const P = BAL_POWERS[k]; on[k] = P.t; a.fx.magic(); feel('wow', 1.3); note(`${P.ic} ${P.name}!`, 1400); a.say('ar_bal_' + k);
     if (k === 'super' && !stuck) { const s = Math.hypot(pet.vx, pet.vy) || 1, sp = 380; pet.vx = pet.vx / s * sp; pet.vy = pet.vy / s * sp; if (Math.abs(pet.vy) < 160) pet.vy = -200; }
   }
   function startBonus() {
@@ -6809,7 +6814,7 @@ function arcBricks(a) {
     bonus = { t: 20, saucers, got: 0, keep: { balloons, obst, drops } }; drops = []; obst = []; newPet(); combo = 0;
   }
   function endBonus() {
-    const pts = bonus.got * 100; score += pts; note(`🛸 Bonus: +${pts}!`, 1800); a.say('ar_bal_back'); a.fx.win();
+    const pts = bonus.got * 100; score += pts; feel('cheer', 1.6); note(`🛸 Bonus: +${pts}!`, 1800); a.say('ar_bal_back'); a.fx.win();
     ({ balloons, obst, drops } = bonus.keep); bonus = null; newPet(); show(); save();
   }
   { const sv = a.load(); if (sv && sv.score !== undefined) { level = sv.level || 0; score = sv.score || 0; kartC = sv.kartC || 0; } }   // (an old Brick Breaker save has no score: start fresh)
@@ -6817,7 +6822,7 @@ function arcBricks(a) {
   setTimeout(() => note(`${BAL_WORLDS[world].icon} Level ${level + 1}: ${BAL_WORLDS[world].name}`, 2000), 50);
   return {
     peek: () => ({ level, score, world, left: balloons.filter(b => b.alive).length, stuck, pet: pet && [Math.round(pet.x), Math.round(pet.y), Math.round(pet.vx), Math.round(pet.vy)], kx: kart.x, kw: kart.w, on: { ...on }, bonus: !!bonus, drops: drops.length, kartC, obst: obst.length, combo }),
-    test: k => power(k), ufo: () => startBonus(), clear: () => { balloons.forEach(b => { b.alive = false; b.late = false; b.kind = b.kind === 'regen' ? 'plain' : b.kind; }); }, aim: x => { kart.tx = x; },
+    test: k => power(k), feel: (m, d = 3) => { mood = { m: 'idle', t: 0 }; feel(m, d); }, ufo: () => startBonus(), clear: () => { balloons.forEach(b => { b.alive = false; b.late = false; b.kind = b.kind === 'regen' ? 'plain' : b.kind; }); }, aim: x => { kart.tx = x; },
     down(x) { touched = true; kart.tx = x; }, move(x) { kart.tx = x; },
     up() { if (stuck && clearT < 0) { stuck = false; bounceUp((Math.random() - .5) * 120 + kart.vx * .3); a.fx.boing(); } },
     update(dt) {
@@ -6827,6 +6832,13 @@ function arcBricks(a) {
       const tw = on.long > 0 ? 150 : 92; kart.w += (tw - kart.w) * Math.min(1, dt * 6);
       const ox = kart.x; kart.x += (Math.max(kart.w / 2, Math.min(W - kart.w / 2, kart.tx)) - kart.x) * Math.min(1, dt * (kart.dizzy > 0 ? 4 : 16)); kart.vx = (kart.x - ox) / Math.max(dt, .001);
       kart.dizzy = Math.max(0, kart.dizzy - dt); kart.squash = Math.max(0, kart.squash - dt * 4);
+      mood.t -= dt; if (mood.t <= 0 && mood.m !== 'idle') mood = { m: 'idle', t: 0 };
+      if (mood.m === 'cheer' && mood.t > .3 && hop === 0 && hopV === 0) hopV = -150;   // keeps hopping while he cheers
+      hopV += 1100 * dt; hop += hopV * dt; if (hop > 0) { if (hopV > 120) kart.squash = Math.max(kart.squash, .6); hop = 0; hopV = 0; }
+      blinkT -= dt; if (blinkT < -.13) blinkT = 2 + Math.random() * 2.5;
+      crestV += (-crestA * 160 - crestV * 9 - kart.vx * .02 - hopV * .02) * dt; crestA += crestV * dt;
+      puffs = puffs.filter(q => (q.t += dt) < .6); puffT -= dt; if (Math.abs(kart.vx) > 120 && puffT <= 0) { puffT = .07; puffs.push({ x: kart.x - Math.sign(kart.vx) * (kart.w / 2 + 2), y: PY + 22, t: 0, d: -Math.sign(kart.vx) }); }
+      if (pet && !stuck && pet.vy > 120 && pet.y > PY - 150 && Math.abs(pet.x - kart.x) > kart.w / 2 + 8 && !bonus) feel('worry', .15);
       bits = bits.filter(b => (b.t += dt) < .7); for (const b of bits) { b.x += b.vx * dt; b.y += b.vy * dt; b.vy += 400 * dt; b.r += dt * 8; }
       floats = floats.filter(f => (f.t += dt) < .9); zaps = zaps.filter(z => (z.t += dt) < .25);
       // falling things: candy (+50), trash (-20), paint buckets (a new kart colour), mystery gifts (a power-up)
@@ -6834,9 +6846,9 @@ function arcBricks(a) {
         d.vy += 260 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
         if (!d.got && d.vy > 0 && Math.abs(d.y - (PY - 4)) < 14 && Math.abs(d.x - kart.x) < kart.w / 2 + 10) {
           d.got = true;
-          if (d.kind === 'candy') { score += 50; floatText(d.x, d.y - 14, '+50', '#ffe066'); a.fx.ding ? a.fx.ding(4) : a.fx.match(); }
-          if (d.kind === 'trash') { score = Math.max(0, score - 20); floatText(d.x, d.y - 14, '−20', '#ff8a8a'); a.fx.wrong(); }
-          if (d.kind === 'paint') { kartC = BAL_KART.indexOf(d.c); burst(kart.x, PY, d.c, 14); a.fx.splash ? a.fx.splash() : a.fx.pop(); save(); }
+          if (d.kind === 'candy') { feel('cheer', .8); score += 50; floatText(d.x, d.y - 14, '+50', '#ffe066'); a.fx.ding ? a.fx.ding(4) : a.fx.match(); }
+          if (d.kind === 'trash') { feel('yuck', 1.2); score = Math.max(0, score - 20); floatText(d.x, d.y - 14, '−20', '#ff8a8a'); a.fx.wrong(); }
+          if (d.kind === 'paint') { feel('cheer', .8); kartC = BAL_KART.indexOf(d.c); burst(kart.x, PY, d.c, 14); a.fx.splash ? a.fx.splash() : a.fx.pop(); save(); }
           if (d.kind === 'gift') power(d.k);
           show();
         }
@@ -6853,7 +6865,7 @@ function arcBricks(a) {
       if (!bonus) {
         nextCrow -= dt; if (!crow && nextCrow <= 0) { const dir = Math.random() < .5 ? 1 : -1; crow = { x: dir > 0 ? -30 : W + 30, y: 30 + Math.random() * 20, dir, drop: 80 + Math.random() * 320, dropped: false }; a.fx.chirp && a.fx.chirp(); }
         if (crow) { crow.x += crow.dir * 110 * dt; if (!crow.dropped && Math.abs(crow.x - crow.drop) < 4) { crow.dropped = true; drops.push({ kind: 'acorn', x: crow.x, y: crow.y + 10, vx: 0, vy: 0, ic: '🌰' }); } if (crow.x < -40 || crow.x > W + 40) { crow = null; nextCrow = 12 + Math.random() * 8; } }
-        for (const d of drops) if (d.kind === 'acorn' && !d.got && d.vy > 0 && Math.abs(d.y - (PY - 4)) < 14 && Math.abs(d.x - kart.x) < kart.w / 2) { d.got = true; kart.dizzy = 1.6; a.fx.boing(); note('Bonk! 💫', 900); }
+        for (const d of drops) if (d.kind === 'acorn' && !d.got && d.vy > 0 && Math.abs(d.y - (PY - 4)) < 14 && Math.abs(d.x - kart.x) < kart.w / 2) { d.got = true; kart.dizzy = 1.6; a.fx.boing(); feel('sad', 1.2); note('Bonk! 💫', 900); }
         // the flying saucer: bonk it for the moon bonus
         nextUfo -= dt; if (!ufo && nextUfo <= 0) { const dir = Math.random() < .5 ? 1 : -1; ufo = { x: dir > 0 ? -30 : W + 30, y: 22, dir }; a.fx.ufo && a.fx.ufo(); }
         if (ufo) { ufo.x += ufo.dir * 75 * dt; if (ufo.x < -40 || ufo.x > W + 40) { ufo = null; nextUfo = 30 + Math.random() * 25; } }
@@ -6892,17 +6904,17 @@ function arcBricks(a) {
           const off = Math.max(-1, Math.min(1, (pet.x - kart.x) / (kart.w / 2)));
           if (sup) { const s = 380; let an = off * .9; if (Math.abs(an) < .15) an = an < 0 ? -.15 : .15; pet.vx = Math.sin(an) * s; pet.vy = -Math.cos(an) * s; }
           else bounceUp(off * 230 + kart.vx * .3 + (Math.abs(off) < .08 ? (Math.random() < .5 ? -40 : 40) : 0));
-          pet.y = PY - KR - 2; kart.squash = 1; pet.sq = 1; combo = 0; a.fx.boing();
+          pet.y = PY - KR - 2; kart.squash = 1; pet.sq = 1; combo = 0; a.fx.boing(); feel('boing', .45);
         }
         // the trampoline (power-up, and always in the bonus round) bounces the kitty back up
         if ((on.tramp > 0 || bonus) && pet.vy > 0 && pet.y + KR >= H - 12) { pet.y = H - 12 - KR; bounceUp(pet.vx * .8); a.fx.boing(); }
-        if (pet.y > H + 30) { newPet(); a.fx.wrong(); missT -= 1; if (missT <= 0) { missT = 3; a.say('ar_bal_oops'); } break; }
+        if (pet.y > H + 30) { newPet(); a.fx.wrong(); feel('sad', 1.8); missT -= 1; if (missT <= 0) { missT = 3; a.say('ar_bal_oops'); } break; }
       }
       // nearly done? the last few balloons gently draw the kitty their way
       const left = balloons.filter(b => b.alive);
       pet.sq = Math.max(0, pet.sq - dt * 5);
       if (!bonus && !left.length && !balloons.some(b => b.late)) {   // grow-back balloons count only while they're up: pop them all at once
-        clearT = 0; drops = drops.filter(d => d.kind === 'candy'); a.fx.win(); a.say('ar_bal_clear'); note(`Level ${level + 1} popped! 🎉`, 2000); save();
+        clearT = 0; drops = drops.filter(d => d.kind === 'candy'); a.fx.win(); feel('cheer', 2.4); a.say('ar_bal_clear'); note(`Level ${level + 1} popped! 🎉`, 2000); save();
         for (let i = 0; i < 6; i++) setTimeout(() => burst(60 + Math.random() * 360, 60 + Math.random() * 140, BAL_WORLDS[world].cols[i % 6], 12), i * 160);
       }
     },
@@ -6957,30 +6969,66 @@ function arcBricks(a) {
   function shade(c) { const n = parseInt(c.slice(1), 16), r = n >> 16, gg = (n >> 8) & 255, b = n & 255, f = .62; return `rgb(${r * f | 0},${gg * f | 0},${b * f | 0})`; }
   function saucer(x, y, s) { g.save(); g.translate(x, y); g.scale(s, s); g.fillStyle = 'rgba(160,255,220,.45)'; g.beginPath(); g.arc(0, -4, 10, Math.PI, 0); g.fill(); g.fillStyle = BAL_INK; g.beginPath(); g.ellipse(0, 2, 22, 7.5, 0, 0, 7); g.fill(); g.fillStyle = '#b9c4d6'; g.beginPath(); g.ellipse(0, 1, 20, 6, 0, 0, 7); g.fill(); for (let i = -2; i <= 2; i++) { g.fillStyle = Math.floor(t * 6 + i) % 2 ? '#ffe066' : '#ff5ab0'; g.beginPath(); g.arc(i * 8, 3, 2.2, 0, 7); g.fill(); } g.restore(); }
   function drawKart() {
-    const x = kart.x, w = kart.w, sq = kart.squash, c = BAL_KART[kartC], top = PY + sq * 3, bob = Math.sin(t * 9) * (Math.abs(kart.vx) > 30 ? 1 : 0);
-    g.save(); g.translate(0, bob);
-    // shadow, wheels
-    g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.ellipse(x, H - 18, w / 2 + 4, 5, 0, 0, 7); g.fill();
-    for (const wx of [x - w / 2 + 16, x + w / 2 - 16]) { g.save(); g.translate(wx, PY + 26); g.rotate(kart.x / 10); g.fillStyle = BAL_INK; g.beginPath(); g.arc(0, 0, 11, 0, 7); g.fill(); g.fillStyle = '#d6dbe6'; g.beginPath(); g.arc(0, 0, 5.5, 0, 7); g.fill(); g.strokeStyle = BAL_INK; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-5, 0); g.lineTo(5, 0); g.moveTo(0, -5); g.lineTo(0, 5); g.stroke(); g.restore(); }
-    // the body: a rounded tub with a bumper
-    g.fillStyle = BAL_INK; arcRound(g, x - w / 2 - 2, top + 2, w + 4, 28, 13); g.fill(); g.fillStyle = c; arcRound(g, x - w / 2, top + 4, w, 24, 11); g.fill();
-    g.fillStyle = 'rgba(255,255,255,.35)'; arcRound(g, x - w / 2 + 6, top + 7, w - 12, 6, 3); g.fill();
-    g.fillStyle = '#e8ecf4'; arcRound(g, x - w / 2 - 4, top + 22, w + 8, 7, 3.5); g.fill(); g.strokeStyle = BAL_INK; g.lineWidth = 1.6; arcRound(g, x - w / 2 - 4, top + 22, w + 8, 7, 3.5); g.stroke();
-    // the springy cushion the kitty bounces on
-    g.fillStyle = BAL_INK; arcRound(g, x - w / 2 + 4, top - 4 + sq * 2, w - 8, 10, 5); g.fill(); g.fillStyle = '#fff'; arcRound(g, x - w / 2 + 6, top - 2.5 + sq * 2, w - 12, 7, 3.5); g.fill();
-    g.fillStyle = '#ff5a4e'; for (let k = x - w / 2 + 10; k < x + w / 2 - 10; k += 12) g.fillRect(k, top - 2.5 + sq * 2, 6, 7);
-    // Pip at the wheel, peeking over the front (he looks the way the kart is going)
-    const dir = kart.vx > 20 ? 1 : kart.vx < -20 ? -1 : 1, hx = x + dir * (w / 2 - 14), hy = top - 4;
-    g.save(); g.translate(hx, hy); g.scale(dir, 1);
-    g.fillStyle = '#ff5a4e'; for (let k = 0; k < 3; k++) { g.beginPath(); g.ellipse(-4 + k * 3, -15 - k, 2.4, 6, -.5 + k * .4, 0, 7); g.fill(); }
-    g.fillStyle = BAL_INK; g.beginPath(); g.arc(0, -4, 10.5, 0, 7); g.fill(); g.fillStyle = '#45c46a'; g.beginPath(); g.arc(0, -4, 9, 0, 7); g.fill();
-    g.fillStyle = '#fff'; g.beginPath(); g.arc(3, -7, 3.6, 0, 7); g.fill(); g.fillStyle = BAL_INK; g.beginPath(); g.arc(4, -7, 1.9, 0, 7); g.fill();
-    g.fillStyle = '#ffb02e'; g.beginPath(); g.moveTo(7, -4); g.quadraticCurveTo(15, -2, 8, 3); g.closePath(); g.fill(); g.strokeStyle = BAL_INK; g.lineWidth = 1.2; g.stroke();
+    const x = kart.x, w = kart.w, sq = kart.squash, c = BAL_KART[kartC], m = mood.m, br = Math.sin(t * 3) * .018;
+    const lean = Math.max(-.13, Math.min(.13, -kart.vx * .00032)) + (m === 'sad' ? .04 * Math.sin(t * 2) : 0), wob = m === 'yuck' ? Math.sin(t * 40) * .03 : 0;
+    // shadow (it shrinks while the kart is up in the air), exhaust puffs
+    g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.ellipse(x, H - 18, (w / 2 + 4) * (1 + hop / 120), 5, 0, 0, 7); g.fill();
+    for (const q of puffs) { g.fillStyle = `rgba(255,255,255,${.7 * (1 - q.t / .6)})`; g.beginPath(); g.arc(q.x + q.d * q.t * 40, q.y - q.t * 18, 4 + q.t * 12, 0, 7); g.fill(); }
+    g.save(); g.translate(x, PY + 37 + hop); g.rotate(lean + wob); g.scale(1 + sq * .14 - br * .5, 1 - sq * .22 + br);
+    // wheels (they squash a little on a hard landing)
+    for (const wx of [-w / 2 + 16, w / 2 - 16]) { g.save(); g.translate(wx, -11); g.scale(1 + sq * .1, 1 - sq * .12); g.rotate(kart.x / 10); g.fillStyle = BAL_INK; g.beginPath(); g.arc(0, 0, 11, 0, 7); g.fill(); g.fillStyle = '#d6dbe6'; g.beginPath(); g.arc(0, 0, 5.5, 0, 7); g.fill(); g.strokeStyle = BAL_INK; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-5, 0); g.lineTo(5, 0); g.moveTo(0, -5); g.lineTo(0, 5); g.stroke(); g.restore(); }
+    // the tub and its bumper
+    g.fillStyle = BAL_INK; arcRound(g, -w / 2 - 2, -35, w + 4, 28, 13); g.fill(); g.fillStyle = c; arcRound(g, -w / 2, -33, w, 24, 11); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.35)'; arcRound(g, -w / 2 + 6, -30, w - 12, 6, 3); g.fill();
+    g.fillStyle = '#e8ecf4'; arcRound(g, -w / 2 - 4, -15, w + 8, 7, 3.5); g.fill(); g.strokeStyle = BAL_INK; g.lineWidth = 1.6; arcRound(g, -w / 2 - 4, -15, w + 8, 7, 3.5); g.stroke();
+    // the springy cushion the kitty bounces on (it dips when the kitty lands)
+    const cy = -41 + sq * 3; g.fillStyle = BAL_INK; arcRound(g, -w / 2 + 4, cy, w - 8, 10, 5); g.fill(); g.fillStyle = '#fff'; arcRound(g, -w / 2 + 6, cy + 1.5, w - 12, 7, 3.5); g.fill();
+    g.fillStyle = '#ff5a4e'; for (let k = -w / 2 + 10; k < w / 2 - 10; k += 12) g.fillRect(k, cy + 1.5, 6, 7);
+    // Pip, facing you from the front of the kart
+    const dir = kart.vx > 25 ? 1 : kart.vx < -25 ? -1 : (pet && pet.x < x ? -1 : 1), hx = dir * (w / 2 - 15), hy = -46;
+    pip(hx, hy, m);
     g.restore();
-    // steering wheel
-    g.strokeStyle = BAL_INK; g.lineWidth = 2.4; g.beginPath(); g.arc(hx - dir * 9, top + 2, 5, 0, 7); g.stroke();
-    if (kart.dizzy > 0) for (let k = 0; k < 3; k++) { const an = t * 6 + k * 2.1; arcEmoji(g, '💫', hx + Math.cos(an) * 12, hy - 22 + Math.sin(an) * 4, 11); }
-    g.restore();
+  }
+  function pip(hx, hy, m) {
+    const cheer = m === 'cheer' || m === 'wow';
+    // wings: resting on the tub, or up and waving when he cheers
+    for (const sx of [-1, 1]) { g.save(); g.translate(hx + sx * 11, hy + 12); g.rotate(sx * (cheer ? -2.1 + Math.sin(t * 18 + sx) * .45 : m === 'worry' ? -1.2 + Math.sin(t * 25) * .3 : -.35)); g.fillStyle = BAL_INK; g.beginPath(); g.ellipse(sx * 7, 0, 9.5, 5.5, 0, 0, 7); g.fill(); g.fillStyle = '#3fae5a'; g.beginPath(); g.ellipse(sx * 7, 0, 8, 4, 0, 0, 7); g.fill(); g.restore(); }
+    // crest feathers wobble on a spring (they droop when he's sad)
+    g.save(); g.translate(hx, hy - 12); g.rotate(crestA + (m === 'sad' ? .9 : 0)); for (let k = -1; k <= 1; k++) { g.fillStyle = BAL_INK; g.beginPath(); g.ellipse(k * 3.4, -6, 3.6, 8, k * .35, 0, 7); g.fill(); g.fillStyle = k ? '#ff7a5c' : '#ff5a4e'; g.beginPath(); g.ellipse(k * 3.4, -6, 2.4, 6.8, k * .35, 0, 7); g.fill(); } g.restore();
+    // head
+    g.fillStyle = BAL_INK; g.beginPath(); g.arc(hx, hy, 14.5, 0, 7); g.fill(); g.fillStyle = m === 'yuck' ? '#8ccf5a' : '#45c46a'; g.beginPath(); g.arc(hx, hy, 13, 0, 7); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.ellipse(hx - 5, hy - 7, 5, 3, -.4, 0, 7); g.fill();
+    if (cheer || m === 'boing') { g.fillStyle = 'rgba(255,120,150,.55)'; g.beginPath(); g.ellipse(hx - 9, hy + 4, 3.4, 2.2, 0, 0, 7); g.ellipse(hx + 9, hy + 4, 3.4, 2.2, 0, 0, 7); g.fill(); }
+    // eyes: they follow the kitty
+    const lx = pet ? Math.max(-1, Math.min(1, (pet.x - kart.x - hx) / 90)) * 1.6 : 0, ly = pet ? Math.max(-1, Math.min(1, (pet.y - (PY + 37 + hy)) / 90)) * 1.6 : 0;
+    g.strokeStyle = BAL_INK; g.lineCap = 'round';
+    for (const sx of [-1, 1]) {
+      const ex = hx + sx * 5.2, ey = hy - 2;
+      if (m === 'boing' || m === 'cheer') { g.lineWidth = 2.2; g.beginPath(); g.arc(ex, ey + 1.5, 3, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); }
+      else if (m === 'wow') arcStar(g, ex, ey, 4.4, '#ffd23f');
+      else if (m === 'yuck') { g.lineWidth = 2; g.beginPath(); g.moveTo(ex - 2.6 * sx, ey - 2.4); g.lineTo(ex + 2 * sx, ey); g.lineTo(ex - 2.6 * sx, ey + 2.4); g.stroke(); }
+      else if (blinkT < 0 && m === 'idle') { g.lineWidth = 2; g.beginPath(); g.moveTo(ex - 3, ey); g.lineTo(ex + 3, ey); g.stroke(); }
+      else {
+        const big = m === 'worry' ? 4.8 : 3.8; g.fillStyle = '#fff'; g.beginPath(); g.arc(ex, ey, big, 0, 7); g.fill(); g.lineWidth = 1.2; g.stroke();
+        g.fillStyle = BAL_INK; g.beginPath(); g.arc(ex + lx, ey + ly, m === 'worry' ? 1.7 : 2.1, 0, 7); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(ex + lx + .7, ey + ly - .8, .7, 0, 7); g.fill();
+        if (m === 'sad') { g.fillStyle = '#45c46a'; g.beginPath(); g.arc(ex, ey, big + .4, Math.PI, 0); g.fill(); g.lineWidth = 1.4; g.beginPath(); g.moveTo(ex - big, ey); g.lineTo(ex + big, ey); g.stroke(); }
+      }
+    }
+    // eyebrows when worried or sad
+    if (m === 'worry' || m === 'sad') { g.lineWidth = 1.8; for (const sx of [-1, 1]) { g.beginPath(); const up = 1; /* inner ends raised: worried and sad, not cross */ g.moveTo(hx + sx * 2.4, hy - 8 - up * 1.6); g.lineTo(hx + sx * 7.8, hy - 8 + up * 1.4); g.stroke(); } }
+    // the beak: shut, open in a happy shout, a little 'o', a frown, or a tongue out
+    const open = m === 'boing' ? 3 : cheer ? 4.5 : m === 'worry' ? 2.6 : m === 'yuck' ? 2.2 : 0;
+    g.lineWidth = 1.4; g.fillStyle = '#ffb02e';
+    if (open) {
+      g.fillStyle = '#7a1d2e'; g.beginPath(); g.ellipse(hx, hy + 6 + open * .5, 3.6, open * .8 + 1, 0, 0, 7); g.fill();
+      if (m === 'yuck' || cheer) { g.fillStyle = '#ff6b8b'; g.beginPath(); g.ellipse(hx, hy + 7.5 + open * .6, 2.4, 1.8, 0, 0, 7); g.fill(); }
+      g.fillStyle = '#ffb02e'; g.beginPath(); g.moveTo(hx - 4.8, hy + 3); g.quadraticCurveTo(hx, hy + 1, hx + 4.8, hy + 3); g.quadraticCurveTo(hx, hy + 6.5, hx - 4.8, hy + 3); g.fill(); g.stroke();
+    } else { g.beginPath(); g.moveTo(hx - 4.4, hy + 2.6); g.quadraticCurveTo(hx, hy + 1, hx + 4.4, hy + 2.6); g.quadraticCurveTo(hx + 1, hy + 9.5, hx, hy + 10); g.quadraticCurveTo(hx - 1, hy + 9.5, hx - 4.4, hy + 2.6); g.fill(); g.stroke(); if (m === 'sad') { g.beginPath(); g.moveTo(hx - 3, hy + 12.5); g.quadraticCurveTo(hx, hy + 10.5, hx + 3, hy + 12.5); g.stroke(); } }
+    // a sweat drop when he's worried; dizzy stars after an acorn bonk; sparkles when he cheers
+    if (m === 'worry') { g.fillStyle = '#8fd3ff'; g.beginPath(); g.moveTo(hx + 13, hy - 10); g.quadraticCurveTo(hx + 17, hy - 3, hx + 13, hy - 2); g.quadraticCurveTo(hx + 9.5, hy - 3, hx + 13, hy - 10); g.fill(); }
+    if (kart.dizzy > 0) for (let k = 0; k < 3; k++) { const an = t * 6 + k * 2.1; arcEmoji(g, '💫', hx + Math.cos(an) * 13, hy - 22 + Math.sin(an) * 4, 11); }
+    if (cheer) for (let k = 0; k < 3; k++) { const an = t * 4 + k * 2.1; arcStar(g, hx + Math.cos(an) * 22, hy - 14 + Math.sin(an) * 8, 3.2, '#ffe066'); }
+    g.lineCap = 'butt';
   }
   function drawPet() {
     if (!pet) return; const sup = on.super > 0, s = 1 + pet.sq * .25;
