@@ -6753,6 +6753,8 @@ function arcBricks(a) {
   let kart = { x: W / 2, tx: W / 2, w: 92, vx: 0, dizzy: 0, squash: 0 }, pet = null, stuck = true, combo = 0, on = {}, clearT = -1, lateT = 0, nextUfo = 0, nextCrow = 0;
   let bonus = null, missT = 0, comboSaid = 0, saidCandy = false, saidTrash = false, touched = false, t = 0;
   const show = () => a.score(`🎈 ${score}`);
+  // notices (combos, power-ups, levels) are a small label along the top edge of the game, so they never cover the play
+  let toast = null; const note = (txt, ms = 1300) => { toast = { txt, t: 0, dur: ms / 1000 }; };
   const save = () => a.save({ level, score, kartC });
   const grav = () => (bonus ? 300 : 470 + Math.min(4, Math.floor(level / 6)) * 28 + Math.floor(level / 30) * 30) * (on.floaty > 0 ? .45 : 1);
   function worldOf(l) { return Math.floor(l / 6) % BAL_WORLDS.length; }
@@ -6791,35 +6793,35 @@ function arcBricks(a) {
     if (b.kind === 'trash') { drops.push({ kind: 'trash', x: b.x, y: b.y, vx: 0, vy: -40, ic: ['🥾', '🦴', '🥫'][Math.floor(Math.random() * 3)] }); if (!saidTrash) { saidTrash = true; a.say('ar_bal_trash'); } }
     if (b.kind === 'paint') drops.push({ kind: 'paint', x: b.x, y: b.y, vx: 0, vy: -40, ic: '🪣', c: BAL_KART[(kartC + 1 + Math.floor(Math.random() * (BAL_KART.length - 1))) % BAL_KART.length] });
     if (b.kind === 'gift') { const ks = Object.keys(BAL_POWERS); drops.push({ kind: 'gift', x: b.x, y: b.y, vx: 0, vy: -50, k: ks[Math.floor(Math.random() * ks.length)] }); }
-    if (combo === 3) a.msg('Combo! ✨', 900); if (combo >= 5 && combo % 5 === 0) { a.msg(`Super combo × ${combo}! 🌟`, 1200); if (t - comboSaid > 20) { comboSaid = t; a.say('ar_bal_combo'); } }
+    if (combo === 3) note('Combo! ✨', 900); if (combo >= 5 && combo % 5 === 0) { note(`Super combo × ${combo}! 🌟`, 1200); if (t - comboSaid > 20) { comboSaid = t; a.say('ar_bal_combo'); } }
     // zappy boots: each pop zaps the nearest balloon too
     if (on.zap > 0 && !viaZap) { let n = null, nd = 120; for (const o of balloons) if (o.alive && o !== b) { const d = Math.hypot(o.x - b.x, o.y - b.y); if (d < nd) { nd = d; n = o; } } if (n) { zaps.push({ x0: b.x, y0: b.y, x1: n.x, y1: n.y, t: 0 }); a.fx.beep && a.fx.beep(); setTimeout(() => pop(n, true), 90); } }
     show();
   }
   function power(k) {
-    const P = BAL_POWERS[k]; on[k] = P.t; a.fx.magic(); a.msg(`${P.ic} ${P.name}!`, 1400); a.say('ar_bal_' + k);
+    const P = BAL_POWERS[k]; on[k] = P.t; a.fx.magic(); note(`${P.ic} ${P.name}!`, 1400); a.say('ar_bal_' + k);
     if (k === 'super' && !stuck) { const s = Math.hypot(pet.vx, pet.vy) || 1, sp = 380; pet.vx = pet.vx / s * sp; pet.vy = pet.vy / s * sp; if (Math.abs(pet.vy) < 160) pet.vy = -200; }
   }
   function startBonus() {
-    a.fx.magic(); a.say('ar_bal_ufo'); a.msg('🛸 Bonus round on the moon!', 1800);
+    a.fx.magic(); a.say('ar_bal_ufo'); note('🛸 Bonus round on the moon!', 1800);
     if (!moonBg) moonBg = balScene(5);
     const saucers = []; for (let i = 0; i < 10; i++) saucers.push({ x: 50 + (i % 5) * 95, y: 60 + Math.floor(i / 5) * 70, ph: i * .7, alive: true });
     bonus = { t: 20, saucers, got: 0, keep: { balloons, obst, drops } }; drops = []; obst = []; newPet(); combo = 0;
   }
   function endBonus() {
-    const pts = bonus.got * 100; score += pts; a.msg(`🛸 Bonus: +${pts}!`, 1800); a.say('ar_bal_back'); a.fx.win();
+    const pts = bonus.got * 100; score += pts; note(`🛸 Bonus: +${pts}!`, 1800); a.say('ar_bal_back'); a.fx.win();
     ({ balloons, obst, drops } = bonus.keep); bonus = null; newPet(); show(); save();
   }
   { const sv = a.load(); if (sv && sv.score !== undefined) { level = sv.level || 0; score = sv.score || 0; kartC = sv.kartC || 0; } }   // (an old Brick Breaker save has no score: start fresh)
   build(); newPet(); show();
-  setTimeout(() => a.msg(`${BAL_WORLDS[world].icon} Level ${level + 1}: ${BAL_WORLDS[world].name}`, 2000), 50);
+  setTimeout(() => note(`${BAL_WORLDS[world].icon} Level ${level + 1}: ${BAL_WORLDS[world].name}`, 2000), 50);
   return {
     peek: () => ({ level, score, world, left: balloons.filter(b => b.alive).length, stuck, pet: pet && [Math.round(pet.x), Math.round(pet.y), Math.round(pet.vx), Math.round(pet.vy)], kx: kart.x, kw: kart.w, on: { ...on }, bonus: !!bonus, drops: drops.length, kartC, obst: obst.length, combo }),
     test: k => power(k), ufo: () => startBonus(), clear: () => { balloons.forEach(b => { b.alive = false; b.late = false; b.kind = b.kind === 'regen' ? 'plain' : b.kind; }); }, aim: x => { kart.tx = x; },
     down(x) { touched = true; kart.tx = x; }, move(x) { kart.tx = x; },
     up() { if (stuck && clearT < 0) { stuck = false; bounceUp((Math.random() - .5) * 120 + kart.vx * .3); a.fx.boing(); } },
     update(dt) {
-      t += dt;
+      t += dt; if (toast) toast.t += dt;
       for (const k in on) { on[k] -= dt; if (on[k] <= 0) delete on[k]; }
       // the kart: follows your finger (slower when the crow's acorn has made it dizzy); it stretches with the power-up
       const tw = on.long > 0 ? 150 : 92; kart.w += (tw - kart.w) * Math.min(1, dt * 6);
@@ -6840,18 +6842,18 @@ function arcBricks(a) {
         }
       }
       drops = drops.filter(d => !d.got && d.y < H + 30);
-      if (clearT >= 0) { clearT += dt; if (clearT > 2.4) { clearT = -1; level++; const nw = worldOf(level); const changed = nw !== world; on = {}; build(); newPet(); show(); save(); a.msg(`${BAL_WORLDS[world].icon} Level ${level + 1}: ${BAL_WORLDS[world].name}`, 2000); if (changed) a.say('ar_bal_w' + world); } return; }
+      if (clearT >= 0) { clearT += dt; if (clearT > 2.4) { clearT = -1; level++; const nw = worldOf(level); const changed = nw !== world; on = {}; build(); newPet(); show(); save(); note(`${BAL_WORLDS[world].icon} Level ${level + 1}: ${BAL_WORLDS[world].name}`, 2000); if (changed) a.say('ar_bal_w' + world); } return; }
       // balloons: grow-back balloons come back, late ones puff in
       for (const b of balloons) {
         if (b.kind === 'regen' && !b.alive && b.back > 0) { b.back -= dt; if (b.back <= 0) { b.alive = true; b.grow = 0; a.fx.pop(); } }
         if (b.grow !== undefined && b.grow < 1) b.grow = Math.min(1, b.grow + dt * 3);
       }
-      if (!bonus && lateT > 0) { lateT -= dt; if (lateT <= 0) { let any = false; for (const b of balloons) if (b.late) { b.late = false; b.alive = true; b.grow = 0; any = true; } if (any) { a.fx.magic(); a.msg('More balloons! 🎈', 1200); } } }
+      if (!bonus && lateT > 0) { lateT -= dt; if (lateT <= 0) { let any = false; for (const b of balloons) if (b.late) { b.late = false; b.alive = true; b.grow = 0; any = true; } if (any) { a.fx.magic(); note('More balloons! 🎈', 1200); } } }
       // the cheeky crow: flies over and drops an acorn; if it bonks the kart, the kart goes dizzy for a moment
       if (!bonus) {
         nextCrow -= dt; if (!crow && nextCrow <= 0) { const dir = Math.random() < .5 ? 1 : -1; crow = { x: dir > 0 ? -30 : W + 30, y: 30 + Math.random() * 20, dir, drop: 80 + Math.random() * 320, dropped: false }; a.fx.chirp && a.fx.chirp(); }
         if (crow) { crow.x += crow.dir * 110 * dt; if (!crow.dropped && Math.abs(crow.x - crow.drop) < 4) { crow.dropped = true; drops.push({ kind: 'acorn', x: crow.x, y: crow.y + 10, vx: 0, vy: 0, ic: '🌰' }); } if (crow.x < -40 || crow.x > W + 40) { crow = null; nextCrow = 12 + Math.random() * 8; } }
-        for (const d of drops) if (d.kind === 'acorn' && !d.got && d.vy > 0 && Math.abs(d.y - (PY - 4)) < 14 && Math.abs(d.x - kart.x) < kart.w / 2) { d.got = true; kart.dizzy = 1.6; a.fx.boing(); a.msg('Bonk! 💫', 900); }
+        for (const d of drops) if (d.kind === 'acorn' && !d.got && d.vy > 0 && Math.abs(d.y - (PY - 4)) < 14 && Math.abs(d.x - kart.x) < kart.w / 2) { d.got = true; kart.dizzy = 1.6; a.fx.boing(); note('Bonk! 💫', 900); }
         // the flying saucer: bonk it for the moon bonus
         nextUfo -= dt; if (!ufo && nextUfo <= 0) { const dir = Math.random() < .5 ? 1 : -1; ufo = { x: dir > 0 ? -30 : W + 30, y: 22, dir }; a.fx.ufo && a.fx.ufo(); }
         if (ufo) { ufo.x += ufo.dir * 75 * dt; if (ufo.x < -40 || ufo.x > W + 40) { ufo = null; nextUfo = 30 + Math.random() * 25; } }
@@ -6898,10 +6900,9 @@ function arcBricks(a) {
       }
       // nearly done? the last few balloons gently draw the kitty their way
       const left = balloons.filter(b => b.alive);
-      if (!bonus && left.length && left.length <= 3 && pet.vy < 0 && !sup) { let n = left[0], nd = 1e9; for (const b of left) { const dd = Math.abs(b.x - pet.x); if (dd < nd) { nd = dd; n = b; } } pet.vx += Math.sign(n.x - pet.x) * Math.min(1, nd / 60) * 260 * dt; }
       pet.sq = Math.max(0, pet.sq - dt * 5);
       if (!bonus && !left.length && !balloons.some(b => b.late)) {   // grow-back balloons count only while they're up: pop them all at once
-        clearT = 0; drops = drops.filter(d => d.kind === 'candy'); a.fx.win(); a.say('ar_bal_clear'); a.msg(`Level ${level + 1} popped! 🎉`, 2000); save();
+        clearT = 0; drops = drops.filter(d => d.kind === 'candy'); a.fx.win(); a.say('ar_bal_clear'); note(`Level ${level + 1} popped! 🎉`, 2000); save();
         for (let i = 0; i < 6; i++) setTimeout(() => burst(60 + Math.random() * 360, 60 + Math.random() * 140, BAL_WORLDS[world].cols[i % 6], 12), i * 160);
       }
     },
@@ -6949,6 +6950,7 @@ function arcBricks(a) {
       if (bonus) arcText(g, `🛸 ${Math.ceil(bonus.t)}`, W - 40, 20, 18, '#9fffcf');
       else { g.fillStyle = 'rgba(0,0,0,.35)'; arcRound(g, W - 62, 6, 54, 24, 12); g.fill(); arcText(g, `Lv ${level + 1}`, W - 35, 18.5, 14, '#fff'); }
       if (combo >= 2 && !stuck) arcText(g, `× ${combo}`, pet.x, pet.y - 30, 15, '#ffe066');
+      if (toast) { const k = toast.t / toast.dur; if (k >= 1) toast = null; else { g.globalAlpha = k > .8 ? (1 - k) / .2 : 1; g.font = '800 15px Fredoka, "Baloo 2", system-ui, sans-serif'; const tw = g.measureText(toast.txt).width + 24; g.fillStyle = 'rgba(30,24,50,.55)'; arcRound(g, W / 2 - tw / 2, 38, tw, 24, 12); g.fill(); arcText(g, toast.txt, W / 2, 50.5, 15, '#fff'); g.globalAlpha = 1; } }
       if (stuck && clearT < 0) arcText(g, touched ? 'Tap to bounce! 🐱' : '👆 Slide to drive, tap to bounce', W / 2, 210, 20, '#ffffff');
     },
   };
