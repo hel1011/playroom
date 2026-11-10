@@ -6777,7 +6777,7 @@ function arcBricks(a) {
   function feel(m, dur) { if (mood.t > 0 && MOOD_RANK[m] < MOOD_RANK[mood.m]) return; mood = { m, t: dur }; if (m === 'cheer' || m === 'wow') hopV = -190; if (m === 'boing') hopV = Math.min(hopV, -60); }
   let toast = null; const note = (txt, ms = 1300) => { toast = { txt, t: 0, dur: ms / 1000 }; };
   const save = () => a.save({ level, score, kartC });
-  const grav = () => (bonus ? 260 : 330 + Math.min(4, Math.floor(level / 6)) * 30 + Math.floor(level / 30) * 30) * (on.floaty > 0 ? .45 : 1);   // gentle to start, a little quicker each world
+  const grav = () => (bonus ? 260 : (level < 3 ? 220 + level * 30 : 310 + Math.min(4, Math.floor(level / 6)) * 30) + Math.floor(level / 30) * 30) * (on.floaty > 0 ? .45 : 1); /* very floaty on the first levels, a little quicker each world */   // gentle to start, a little quicker each world
   function worldOf(l) { return Math.floor(l / 6) % BAL_WORLDS.length; }
   function build() {
     const w = worldOf(level), k = level % 6, loop = Math.floor(level / 30), R = balRand(level * 131 + 17), Wd = BAL_WORLDS[w];
@@ -6801,7 +6801,7 @@ function arcBricks(a) {
     lateT = 14; nextUfo = level >= 2 ? 14 + R() * 18 : 1e9; nextCrow = w >= 3 || loop ? 9 + R() * 6 : 1e9; crow = null; ufo = null; drops = []; zaps = [];
   }
   function newPet() { stuck = true; combo = 0; pet = { x: kart.x, y: PY - KR - 2, vx: 0, vy: 0, rot: 0, sq: 0 }; }
-  function bounceUp(ang) { const g0 = grav(), v = Math.sqrt(2 * g0 * (PY - (bonus ? 60 : 34))); pet.vy = -v; pet.vx = Math.max(-330, Math.min(330, ang)); }
+  function bounceUp(ang, top = bonus ? 60 : 34) { const g0 = grav(), v = Math.sqrt(2 * g0 * (PY - top)), hs = Math.min(1, Math.sqrt(g0 / 470)); pet.vy = -v; pet.vx = Math.max(-330, Math.min(330, ang * hs)); } /* sideways speed slows with the gravity, so the arcs keep their shape */
   function floatText(x, y, txt, c = '#fff') { floats.push({ x, y, txt, c, t: 0 }); }
   function burst(x, y, c, n = 8) { for (let i = 0; i < n; i++) { const an = Math.random() * 6.3, sp = 60 + Math.random() * 140; bits.push({ x, y, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp - 40, c, t: 0, r: Math.random() * 6.3 }); } }
   function pop(b, viaZap) {
@@ -6842,7 +6842,7 @@ function arcBricks(a) {
     knob: () => (kart.x - kart.w / 2) / Math.max(1, W - kart.w), slideTo: f => { touched = true; kart.tx = kart.w / 2 + f * (W - kart.w); },
     test: k => power(k), feel: (m, d = 3) => { mood = { m: 'idle', t: 0 }; feel(m, d); }, ufo: () => startBonus(), clear: () => { balloons.forEach(b => { b.alive = false; b.late = false; b.kind = b.kind === 'regen' ? 'plain' : b.kind; }); }, aim: x => { kart.tx = x; },
     down(x) { touched = true; kart.tx = x; }, move(x) { kart.tx = x; },
-    up() { if (stuck && clearT < 0) { stuck = false; bounceUp((Math.random() - .5) * 120 + kart.vx * .3); a.fx.boing(); } },
+    up() { if (stuck && clearT < 0) { stuck = false; bounceUp(Math.max(-70, Math.min(70, (Math.random() - .5) * 80 + kart.vx * .1)), 120); a.fx.boing(); } /* the launch is a gentle lob: not so high, hardly sideways */ },
     update(dt) {
       t += dt; if (toast) toast.t += dt;
       for (const k in on) { on[k] -= dt; if (on[k] <= 0) delete on[k]; }
