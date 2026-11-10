@@ -661,7 +661,7 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .arc-msg.bump { animation: plop .4s cubic-bezier(.3,1.6,.5,1); }
 @media (max-height: 520px) { .arc-top { padding: 4px 8px 2px 12px; font-size: 17px; } .arc-x { width: 40px; height: 40px; } }
 .arc-top b, .arc-score { white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.arc-top b { flex: 0 1 auto; } .arc-score { flex: 0 1 auto; }
+.arc-top b { flex: 0 1 auto; min-width: 26px; } .arc-score { flex: 0 0 auto; max-width: 55%; }   /* the score shows in full (the title gives way first); it can't push the buttons off */
 .arc-x, .arc-mus, .arc-re { flex: 0 0 auto; }
 .arc-re { border: 0; width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,.14); color: #fff; font: 800 22px/1 var(--f-display); cursor: pointer; margin-right: 8px; }
 .arc-re.ask { background: #ffd23f; color: #3a3340; }   /* the buttons never get squeezed off the edge on a narrow phone */
