@@ -1645,7 +1645,8 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 @keyframes sb-fall { to { transform: translateY(calc(100vh + 120px)) rotate(var(--r)); } }
 .sb-bonus.wheel .sb-rays { opacity: .6; } .sb-bonus.wheel .sb-wheel-wrap, .sb-bonus.wheel .sb-btitle { z-index: 1; }
 .sb-bonus.wheel .sb-wheel-wrap { animation: sb-rise-in .6s cubic-bezier(.2,1.5,.4,1); } @keyframes sb-rise-in { from { transform: translateY(80%) scale(.3) rotate(-90deg); opacity: 0; } }
-.sb-lever { position: relative; width: 50px; height: 100px; border: 0; background: none; cursor: pointer; flex: none; padding: 0; }
+.sb-lever { position: relative; width: 50px; height: 100px; border: 0; background: none; cursor: pointer; flex: none; padding: 0; touch-action: none; }
+.sb-wheel { touch-action: none; cursor: grab; }
 .sb-slot { position: absolute; left: 50%; top: 14px; bottom: 18px; width: 10px; margin-left: -5px; border-radius: 6px; background: #7a1336; box-shadow: inset 0 2px 3px rgba(0,0,0,.4); }
 .sb-knob { position: absolute; left: 50%; top: 2px; width: 36px; height: 36px; margin-left: -18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff 0 12%, #ffd43b 13% 60%, #f59f00); box-shadow: 0 3px 0 #c47f00; }
 .sb-lever b { position: absolute; bottom: 0; left: -4px; right: -4px; text-align: center; font: 800 12px/1 var(--f-display); color: #fff; letter-spacing: .05em; }
@@ -12499,7 +12500,25 @@ function wordBingo(root, api) {
     c.animate([{ transform: 'translate(-50%,-50%) scale(1.6)' }, { transform: `translate(calc(-50% + ${(b.left - a.left) / 2}px), calc(-50% - 40px)) scale(1.4)`, offset: .45 }, { transform: `translate(calc(-50% + ${b.left - a.left - a.width / 2 + 14}px), calc(-50% + ${b.top - a.top - a.height / 2 + 10}px)) scale(.7)` }], { duration: 650, easing: 'ease-in-out' }).onfinish = () => c.remove();
   }
   reels.forEach((r, i) => r.addEventListener('click', () => { const p = pending.find(q => q.r === i); if (!p || busy || !p.w) return; Sound.say(p.t === 'pic' && !p.done ? 'sb_pic' : sbId(p.w), { silentCaption: !p.done && p.t === 'sound' }); }));   // tap a reel to hear it again (a picture stays a puzzle)
-  lever.addEventListener('click', spin);
+  // the lever: tap it, or grab the knob and pull it down; it follows your finger and fires once pulled most of the way
+  const knob = lever.querySelector('.sb-knob'); let pull = null, viaPtr = false;
+  lever.addEventListener('pointerdown', e => {
+    e.preventDefault(); Sound.unlock && Sound.unlock(); try { lever.setPointerCapture(e.pointerId); } catch (er) {}
+    pull = { y: e.clientY, dy: 0, fired: false }; lever.classList.remove('nudge'); knob.style.transition = 'none';
+  });
+  lever.addEventListener('pointermove', e => {
+    if (!pull || pull.fired) return;
+    pull.dy = Math.max(0, Math.min(50, e.clientY - pull.y)); knob.style.transform = `translateY(${pull.dy}px) scale(${1 - pull.dy * .0012})`;
+    if (pull.dy >= 34) { pull.fired = true; knob.style.transition = ''; knob.style.transform = ''; spin(); }
+  });
+  const letGo = () => {
+    if (!pull) return; const p = pull; pull = null; viaPtr = true; knob.style.transition = 'transform .3s cubic-bezier(.3,1.7,.5,1)'; knob.style.transform = '';
+    if (p.fired) return;
+    if (p.dy < 8) spin();                   // a tap
+    else Sound.fx.boing();                  // pulled only a little: it springs back (pull further to spin)
+  };
+  lever.addEventListener('pointerup', letGo); lever.addEventListener('pointercancel', letGo);
+  lever.addEventListener('click', () => { if (viaPtr) { viaPtr = false; return; } spin(); });   // the keyboard still works
   // ---------- tapping the card ----------
   function tapSq(i, el) {
     if (busy || over || marked.has(i)) { if (!busy && !over) Sound.fx.boing(); return; }
@@ -12638,9 +12657,11 @@ function wordBingo(root, api) {
       bonusEl.className = 'sb-bonus wheel'; bonusEl.innerHTML = `<div class="sb-rays"></div><div class="sb-btitle">PRIZE WHEEL!</div><div class="sb-wheel-wrap"><div class="sb-pointer">▼</div><svg class="sb-wheel" viewBox="-108 -108 216 216"><circle r="106" fill="#fff"/>${slices}<circle r="18" fill="#fff" stroke="#ffd43b" stroke-width="5"/></svg><button type="button" class="sb-wspin">SPIN!</button></div>`;
       bonusEl.hidden = false; Sound.fx.fanfare ? Sound.fx.fanfare() : Sound.fx.win(); Sound.say('sb_jackpot');
       const wheel = bonusEl.querySelector('.sb-wheel'), go = bonusEl.querySelector('.sb-wspin'); let spun = false;
-      const spinIt = async () => {
+      const spinIt = async (from = 0, dir = 1, turns = 5) => {
         if (spun) return; spun = true; go.classList.add('gone'); Sound.fx.clack();
-        const turn = 360 * 5 + (360 - (k * seg + seg / 2)); wheel.style.transform = `rotate(${turn}deg)`;
+        const target = ((360 - (k * seg + seg / 2)) % 360 + 360) % 360; let end;
+        if (dir > 0) { end = from + turns * 360; end += ((target - end) % 360 + 360) % 360; } else { end = from - turns * 360; end -= ((end - target) % 360 + 360) % 360; }
+        wheel.style.transition = ''; void wheel.getBoundingClientRect(); wheel.style.transform = `rotate(${end}deg)`;
         let t = 60; const tick = () => { if (!alive || t > 520) return; Sound.fx.tick(); t *= 1.12; later(tick, t); }; tick();
         await wait(4300); Sound.fx.win(); wheel.querySelectorAll('path')[k].classList.add('lit'); await wait(900);
         bonusEl.classList.add('bye'); await wait(450); bonusEl.hidden = true; bonusEl.className = 'sb-bonus';
@@ -12652,8 +12673,24 @@ function wordBingo(root, api) {
         else await (Math.random() < .5 ? bonusRound() : chestRound());
         res();
       };
-      go.addEventListener('click', spinIt); wheel.addEventListener('click', spinIt);
-      later(() => { if (!spun) spinIt(); }, 9000);   // spins by itself if nobody taps
+      go.addEventListener('click', () => spinIt());
+      // grab the wheel: it turns with your finger; let go with a flick (or after a good turn) and it spins off that way
+      let drag = null; const ang = e => { const r = wheel.getBoundingClientRect(); return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180 / Math.PI; };
+      wheel.addEventListener('pointerdown', e => { if (spun) return; e.preventDefault(); try { wheel.setPointerCapture(e.pointerId); } catch (er) {} wheel.style.transition = 'none'; drag = { a: ang(e), rot: 0, moved: 0, hist: [[performance.now(), 0]] }; });
+      wheel.addEventListener('pointermove', e => {
+        if (!drag || spun) return; let d = ang(e) - drag.a; if (d > 180) d -= 360; if (d < -180) d += 360; drag.a += d; drag.rot += d; drag.moved += Math.abs(d);
+        wheel.style.transform = `rotate(${drag.rot}deg)`; drag.hist.push([performance.now(), drag.rot]); if (drag.hist.length > 6) drag.hist.shift();
+        if (Math.floor(drag.rot / 45) !== Math.floor((drag.rot - d) / 45)) Sound.fx.tick();
+      });
+      const wheelUp = () => {
+        if (!drag || spun) return; const dd = drag; drag = null;
+        const [t0, r0] = dd.hist[0], [t1, r1] = dd.hist[dd.hist.length - 1], v = (r1 - r0) / Math.max(1, t1 - t0);   // degrees per ms
+        if (dd.moved < 6) { spinIt(dd.rot); return; }   // a tap
+        const dir = Math.abs(v) > .05 ? Math.sign(v) : Math.sign(dd.rot) || 1;
+        spinIt(dd.rot, dir, Math.round(3 + Math.min(4, Math.abs(v) * 2.5)));   // a harder flick goes round more times
+      };
+      wheel.addEventListener('pointerup', wheelUp); wheel.addEventListener('pointercancel', wheelUp);
+      later(() => { if (!spun && !drag) spinIt(); }, 9000);   // spins by itself if nobody taps
     });
   }
   // ---------- treasure chests: open the chest that says the word ----------
