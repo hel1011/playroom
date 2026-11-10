@@ -649,6 +649,12 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .arc-mus[aria-pressed="false"]::after { content: ''; position: absolute; left: 8px; right: 8px; top: 50%; height: 3px; background: #ff5a4e; transform: rotate(-35deg); border-radius: 2px; }
 .arc-x { border: 0; width: 46px; height: 46px; border-radius: 50%; background: #ff5a4e; color: #fff; font: 800 22px/1 var(--f-display); box-shadow: 0 4px 0 #b83a32; cursor: pointer; }
 .arc-stage { position: relative; flex: 1 1 auto; min-height: 0; display: grid; place-items: center; padding: 0 8px 8px; }
+.arc-stage.has-slide { grid-template-rows: auto auto; align-content: center; row-gap: 10px; }
+.arc-slide { position: relative; height: 48px; border-radius: 24px; background: rgba(255,255,255,.13); box-shadow: inset 0 3px 8px rgba(0,0,0,.4); touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; }
+.arc-slide::before { content: ""; position: absolute; left: 32px; right: 32px; top: 50%; height: 4px; margin-top: -2px; border-radius: 2px; background: rgba(255,255,255,.25); }
+.arc-knob { position: absolute; top: 4px; left: 50%; width: 64px; height: 40px; margin-left: -32px; border-radius: 20px; background: #ffd23f; box-shadow: 0 3px 0 #c99a00; display: grid; place-items: center; font: 800 15px/1 var(--f-display); color: #3a3340; letter-spacing: 4px; pointer-events: none; }
+.arc-slide.on .arc-knob { background: #ffe680; transform: scale(1.06); }
+@media (orientation: landscape) and (max-height: 500px) { .arc-stage.has-slide { row-gap: 6px; } .arc-slide { height: 36px; border-radius: 18px; } .arc-knob { top: 3px; height: 30px; border-radius: 15px; } }
 .arc-cv { display: block; border-radius: 16px; touch-action: none; user-select: none; -webkit-user-select: none; box-shadow: 0 0 0 4px rgba(255,255,255,.08); }
 .arc-msg { position: absolute; left: 50%; top: 30%; translate: -50% -50%; background: #fff; color: var(--ink); border-radius: 22px; padding: 14px 22px; font: 800 clamp(20px, 5vw, 30px)/1.15 var(--f-display); text-align: center; box-shadow: 0 6px 0 rgba(0,0,0,.25); pointer-events: none; max-width: 86%; }
 .arc-msg.bump { animation: plop .4s cubic-bezier(.3,1.6,.5,1); }
@@ -5894,7 +5900,7 @@ const ARC_GAMES = {
   lunar: { title: 'Moon Landing', icon: '🚀', how: 'ar_lunar_how', make: arcLunar, save: true },
   race: { title: 'Turbo Race', icon: '🏎️', how: 'ar_race_how', make: arcRace, music: true },
   kick: { title: 'Free Kick', icon: '⚽', how: 'ar_kick_how', make: arcKick },
-  bricks: { title: 'Balloon Bounce', icon: '🎈', how: 'ar_bal_how', make: arcBricks, save: true, music: true },
+  bricks: { title: 'Balloon Bounce', icon: '🎈', how: 'ar_bal_how', make: arcBricks, save: true, music: true, slider: true },
   skee: { title: 'Skee-Ball', icon: SKEE_ICON, how: 'ar_skee_how', make: arcSkee },
   pong: { title: 'Table Tennis', icon: '🏓', how: 'ar_pong_how', make: arcPong },
   unicorn: { title: 'Unicorn Ride', icon: '🦄', how: 'uni_intro', make: arcUnicorn, music: true, save: true },
@@ -5904,18 +5910,19 @@ function openArcade(kind, host, onClose) {
   const G = ARC_GAMES[kind]; Sound.stopVoice();
   const wrap = document.createElement('div'); wrap.className = 'arc arc-' + kind;
   wrap.innerHTML = `<div class="arc-top"><b>${G.icon} ${G.title}</b><span class="arc-score"></span>${G.save ? `<button type="button" class="arc-re" aria-label="Start over">↺</button>` : ''}${G.music ? `<button type="button" class="arc-mus" aria-label="Music" aria-pressed="${Sound.musicOn}">🎵</button>` : ''}<button type="button" class="arc-x" aria-label="Back to the treehouse">✕</button></div>
-    <div class="arc-stage"><canvas class="arc-cv"></canvas><div class="arc-msg" hidden></div></div>`;
+    <div class="arc-stage${G.slider ? ' has-slide' : ''}"><canvas class="arc-cv"></canvas>${G.slider ? `<div class="arc-slide" role="slider" aria-label="Drive left and right"><span class="arc-knob">◀ ▶</span></div>` : ''}<div class="arc-msg" hidden></div></div>`;
   host.appendChild(wrap);
+  const slideEl = wrap.querySelector('.arc-slide'), knobEl = slideEl && slideEl.querySelector('.arc-knob');
   const cv = wrap.querySelector('canvas'), g = cv.getContext('2d'), stage = wrap.querySelector('.arc-stage'), msgEl = wrap.querySelector('.arc-msg'), scoreEl = wrap.querySelector('.arc-score');
   const W = 480, H = 360; let raf = 0, last = 0, alive = true, msgT = null, said = 0;
   // sized from the layout (not the on-screen box, which is tiny while the opening animation plays)
   function fit() {
-    const r = { width: stage.clientWidth - 16, height: stage.clientHeight - 8 }; if (r.width <= 0 || r.height <= 0) return;
+    const extra = slideEl ? slideEl.offsetHeight + (parseFloat(getComputedStyle(stage).rowGap) || 0) : 0, r = { width: stage.clientWidth - 16, height: stage.clientHeight - 8 - extra }; if (r.width <= 0 || r.height <= 0) return;
     const s = Math.min(r.width / W, r.height / H), dpr = Math.min(2, window.devicePixelRatio || 1);
-    cv.style.width = W * s + 'px'; cv.style.height = H * s + 'px'; cv.width = Math.round(W * s * dpr); cv.height = Math.round(H * s * dpr);
+    cv.style.width = W * s + 'px'; cv.style.height = H * s + 'px'; if (slideEl) slideEl.style.width = W * s + 'px'; cv.width = Math.round(W * s * dpr); cv.height = Math.round(H * s * dpr);
     g.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
     // messages sit over the game picture itself (on an upright phone the picture is a band in the middle of a tall stage)
-    msgEl.style.top = ((stage.clientHeight - 8 - H * s) / 2 + H * s * .3) + 'px'; msgEl.style.maxWidth = Math.max(160, W * s - 24) + 'px';
+    msgEl.style.top = ((stage.clientHeight - 8 - extra - H * s) / 2 + H * s * .3) + 'px'; msgEl.style.maxWidth = Math.max(160, W * s - 24) + 'px';
   }
   const ro = new ResizeObserver(fit); ro.observe(stage); fit();
   const api = {
@@ -5936,10 +5943,19 @@ function openArcade(kind, host, onClose) {
   cv.addEventListener('pointermove', e => { game.move && game.move(...toL(e), e.pointerId); });
   const up = e => { game.up && game.up(...toL(e), e.pointerId); };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  // the drive slider: drag (or tap) anywhere along it to move, so a finger never has to cover the game; letting go launches when waiting
+  if (slideEl) {
+    const at = e => { const r = slideEl.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left - 32) / Math.max(1, r.width - 64))); };
+    slideEl.addEventListener('pointerdown', e => { e.preventDefault(); Sound.unlock(); try { slideEl.setPointerCapture(e.pointerId); } catch (err) {} slideEl.classList.add('on'); game.slideTo && game.slideTo(at(e)); });
+    slideEl.addEventListener('pointermove', e => { if (slideEl.classList.contains('on')) game.slideTo && game.slideTo(at(e)); });
+    const sUp = () => { if (!slideEl.classList.contains('on')) return; slideEl.classList.remove('on'); game.up && game.up(); };
+    slideEl.addEventListener('pointerup', sUp); slideEl.addEventListener('pointercancel', sUp);
+  }
   function frame(t) {
     if (!alive) return; raf = requestAnimationFrame(frame);
     const dt = Math.min(.05, (t - (last || t)) / 1000); last = t;
     game.update(dt); g.save(); game.draw(); g.restore();
+    if (knobEl && game.knob) knobEl.style.left = `calc(32px + (100% - 64px) * ${game.knob().toFixed(4)})`;
   }
   raf = requestAnimationFrame(frame);
   function close() {
@@ -6760,7 +6776,7 @@ function arcBricks(a) {
   function feel(m, dur) { if (mood.t > 0 && MOOD_RANK[m] < MOOD_RANK[mood.m]) return; mood = { m, t: dur }; if (m === 'cheer' || m === 'wow') hopV = -190; if (m === 'boing') hopV = Math.min(hopV, -60); }
   let toast = null; const note = (txt, ms = 1300) => { toast = { txt, t: 0, dur: ms / 1000 }; };
   const save = () => a.save({ level, score, kartC });
-  const grav = () => (bonus ? 300 : 470 + Math.min(4, Math.floor(level / 6)) * 28 + Math.floor(level / 30) * 30) * (on.floaty > 0 ? .45 : 1);
+  const grav = () => (bonus ? 260 : 330 + Math.min(4, Math.floor(level / 6)) * 30 + Math.floor(level / 30) * 30) * (on.floaty > 0 ? .45 : 1);   // gentle to start, a little quicker each world
   function worldOf(l) { return Math.floor(l / 6) % BAL_WORLDS.length; }
   function build() {
     const w = worldOf(level), k = level % 6, loop = Math.floor(level / 30), R = balRand(level * 131 + 17), Wd = BAL_WORLDS[w];
@@ -6805,7 +6821,7 @@ function arcBricks(a) {
   }
   function power(k) {
     const P = BAL_POWERS[k]; on[k] = P.t; a.fx.magic(); feel('wow', 1.3); note(`${P.ic} ${P.name}!`, 1400); a.say('ar_bal_' + k);
-    if (k === 'super' && !stuck) { const s = Math.hypot(pet.vx, pet.vy) || 1, sp = 380; pet.vx = pet.vx / s * sp; pet.vy = pet.vy / s * sp; if (Math.abs(pet.vy) < 160) pet.vy = -200; }
+    if (k === 'super' && !stuck) { const s = Math.hypot(pet.vx, pet.vy) || 1, sp = 330; pet.vx = pet.vx / s * sp; pet.vy = pet.vy / s * sp; if (Math.abs(pet.vy) < 160) pet.vy = -200; }
   }
   function startBonus() {
     a.fx.magic(); a.say('ar_bal_ufo'); note('🛸 Bonus round on the moon!', 1800);
@@ -6822,6 +6838,7 @@ function arcBricks(a) {
   setTimeout(() => note(`${BAL_WORLDS[world].icon} Level ${level + 1}: ${BAL_WORLDS[world].name}`, 2000), 50);
   return {
     peek: () => ({ level, score, world, left: balloons.filter(b => b.alive).length, stuck, pet: pet && [Math.round(pet.x), Math.round(pet.y), Math.round(pet.vx), Math.round(pet.vy)], kx: kart.x, kw: kart.w, on: { ...on }, bonus: !!bonus, drops: drops.length, kartC, obst: obst.length, combo }),
+    knob: () => (kart.x - kart.w / 2) / Math.max(1, W - kart.w), slideTo: f => { touched = true; kart.tx = kart.w / 2 + f * (W - kart.w); },
     test: k => power(k), feel: (m, d = 3) => { mood = { m: 'idle', t: 0 }; feel(m, d); }, ufo: () => startBonus(), clear: () => { balloons.forEach(b => { b.alive = false; b.late = false; b.kind = b.kind === 'regen' ? 'plain' : b.kind; }); }, aim: x => { kart.tx = x; },
     down(x) { touched = true; kart.tx = x; }, move(x) { kart.tx = x; },
     up() { if (stuck && clearT < 0) { stuck = false; bounceUp((Math.random() - .5) * 120 + kart.vx * .3); a.fx.boing(); } },
@@ -6902,8 +6919,8 @@ function arcBricks(a) {
         // the kart: where the kitty lands sets which way it flies, and a moving kart gives it a push
         if (pet.vy > 0 && pet.y + KR >= PY - 2 && pet.y < PY + 10 && Math.abs(pet.x - kart.x) < kart.w / 2 + KR * .6) {
           const off = Math.max(-1, Math.min(1, (pet.x - kart.x) / (kart.w / 2)));
-          if (sup) { const s = 380; let an = off * .9; if (Math.abs(an) < .15) an = an < 0 ? -.15 : .15; pet.vx = Math.sin(an) * s; pet.vy = -Math.cos(an) * s; }
-          else bounceUp(off * 230 + kart.vx * .3 + (Math.abs(off) < .08 ? (Math.random() < .5 ? -40 : 40) : 0));
+          if (sup) { const s = 330; let an = off * .9; if (Math.abs(an) < .15) an = an < 0 ? -.15 : .15; pet.vx = Math.sin(an) * s; pet.vy = -Math.cos(an) * s; }
+          else bounceUp(off * 190 + kart.vx * .25 + (Math.abs(off) < .08 ? (Math.random() < .5 ? -34 : 34) : 0));
           pet.y = PY - KR - 2; kart.squash = 1; pet.sq = 1; combo = 0; a.fx.boing(); feel('boing', .45);
         }
         // the trampoline (power-up, and always in the bonus round) bounces the kitty back up
