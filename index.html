@@ -6868,8 +6868,21 @@ function arcBricks(a) {
         if (pet.y < KR) { pet.y = KR; pet.vy = Math.abs(pet.vy) * (sup ? 1 : .5); a.fx.tick(); }
         for (const o of obst) { const dx = pet.x - o.x, dy = pet.y - o.y, dd = Math.hypot(dx, dy); if (dd < o.r + KR && dd > 0) { const nx = dx / dd, ny = dy / dd, dot = pet.vx * nx + pet.vy * ny; if (dot < 0) { pet.vx -= 2 * dot * nx; pet.vy -= 2 * dot * ny; } const boost = o.kind === 'bump' ? 1.12 : 1; pet.vx *= boost; pet.vy *= boost; if (o.kind === 'wheel') pet.vx += (Math.random() - .5) * 120; pet.x = o.x + nx * (o.r + KR + 1); pet.y = o.y + ny * (o.r + KR + 1); o.hit = .3; score += 5; a.fx.boing(); const s = Math.hypot(pet.vx, pet.vy); if (s > 640) { pet.vx *= 640 / s; pet.vy *= 640 / s; } } }
         // balloons pop as the kitty flies through them
-        const reach = KR + (sup ? 20 : 13);
-        if (!bonus) for (const b of balloons) if (b.alive && (b.grow === undefined || b.grow >= 1) && Math.hypot(pet.x - b.x, pet.y - (b.y + Math.sin(t * 1.6 + b.ph) * 2.5)) < reach * (b.kind === 'inner' ? .8 : 1)) pop(b);
+        // balloons: the kitty bounces off the one it hits and pops it (Super Kitty ploughs straight through instead)
+        const reach = KR + (sup ? 20 : 12);
+        if (!bonus) for (const bl of balloons) {
+          if (!bl.alive || (bl.grow !== undefined && bl.grow < 1)) continue;
+          const by = bl.y + Math.sin(t * 1.6 + bl.ph) * 2.5, dx = pet.x - bl.x, dy = pet.y - by, dd = Math.hypot(dx, dy), rr = reach * (bl.kind === 'inner' ? .8 : 1);
+          if (dd >= rr) continue;
+          pop(bl);
+          if (!sup && dd > 0) {
+            const nx = dx / dd, ny = dy / dd, dot = pet.vx * nx + pet.vy * ny;
+            if (dot < 0) { pet.vx -= 1.9 * dot * nx; pet.vy -= 1.9 * dot * ny; }   // a bouncy rebound, a touch softer than a perfect one
+            pet.x = bl.x + nx * rr; pet.y = by + ny * rr;
+            if (Math.abs(pet.vx) < 25) pet.vx += (Math.random() < .5 ? -1 : 1) * 40;   // never straight up and down forever
+            break;   // one balloon per bounce
+          }
+        }
         if (bonus) for (const s of bonus.saucers) if (s.alive && Math.hypot(pet.x - s.sx, pet.y - s.sy) < KR + 16) { s.alive = false; bonus.got++; combo++; floatText(s.sx, s.sy - 10, '+100', '#9fffcf'); burst(s.sx, s.sy, '#9fffcf', 10); a.fx.pop(); a.fx.count(Math.min(9, combo)); }
         if (ufo && Math.hypot(pet.x - ufo.x, pet.y - ufo.y) < KR + 18) { ufo = null; burst(pet.x, pet.y, '#9fffcf', 14); startBonus(); return; }
         // the kart: where the kitty lands sets which way it flies, and a moving kart gives it a push
