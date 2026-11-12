@@ -1513,7 +1513,8 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 .bb-book { position: absolute; border: 3px solid #fff; border-radius: 16px; box-shadow: 0 3px 0 var(--edge); pointer-events: none; }
 .bb-hd { position: absolute; left: 0; right: 0; top: 0; height: 27px; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 8px; background: #fff; border-radius: 12px 12px 0 0; font: 800 15px/1 var(--f-display); color: var(--ink); }
 .bb-call { display: flex; align-items: center; gap: 4px; font: 800 14px/1 var(--f-display); margin-left: auto; } .bb-call svg { width: auto; height: 22px; }
-.bb-pickb { pointer-events: auto; border: 0; border-radius: 10px; background: #eaf3ff; box-shadow: 0 2px 0 var(--edge); padding: 3px 7px; font: 800 12px/1.2 var(--f-display); color: var(--ink); cursor: pointer; }
+.bb-pickb { pointer-events: auto; flex: none; border: 0; border-radius: 999px; background: #ff9f1c; box-shadow: 0 3px 0 #c46d00, 0 0 0 2px #fff; padding: 6px 13px; font: 800 15px/1.1 var(--f-display); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.2); cursor: pointer; white-space: nowrap; }
+.bb-pickb:active { translate: 0 2px; box-shadow: 0 1px 0 #c46d00, 0 0 0 2px #fff; }
 .bb-goal { position: absolute; right: 5px; bottom: 5px; width: 90px; height: 90px; padding: 0; border: 0; cursor: pointer; pointer-events: auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 0 var(--edge), 0 0 0 2px #ffd21f inset; display: grid; place-items: center; overflow: hidden; }
 .bb-goal img { width: 100%; height: 100%; object-fit: contain; } .bb-goal span { position: absolute; left: 0; right: 0; bottom: 3px; text-align: center; font: 800 11px/1 var(--f-display); color: #a07800; }
 .bb-float { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
