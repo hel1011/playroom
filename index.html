@@ -12773,6 +12773,22 @@ function mzBuild(L, flip) {
     while (q.length) { const [x, y] = q.shift(); for (const d of [N_, E_, S_, W_]) { if (!(g[y][x] & d)) continue; const [dx, dy] = MZ_D[d], n = [x + dx, y + dy];
       if (blocked && blocked.has(edge([x, y], n))) continue; if (!dist.has(key(...n))) { dist.set(key(...n), dist.get(key(x, y)) + 1); par.set(key(...n), [x, y]); q.push(n); } } }
     return { dist, par }; };
+  // the nest is the end of the line: Pip finishes the moment he gets there, so no corridor may carry on past it (a strawberry
+  // back there could never be picked). Any extra way out of the nest is closed, and the bit it led to is joined on somewhere else.
+  {
+    const OPP = { [N_]: S_, [E_]: W_, [S_]: N_, [W_]: E_ }, [gx, gy] = goal, toward = bfs([0, 0]).par.get(key(gx, gy));
+    for (const d of [N_, E_, S_, W_]) {
+      if (!(g[gy][gx] & d)) continue; const [dx, dy] = MZ_D[d], n = [gx + dx, gy + dy];
+      if (n[0] === toward[0] && n[1] === toward[1]) continue;
+      g[gy][gx] &= ~d; g[n[1]][n[0]] &= ~OPP[d];
+      const cut = bfs(n).dist; let joined = false;
+      for (const k of shuffle([...cut.keys()])) { const [x, y] = k.split(',').map(Number);
+        for (const d2 of shuffle([N_, E_, S_, W_])) { const [ex, ey] = MZ_D[d2], m = [x + ex, y + ey];
+          if (m[0] < 0 || m[1] < 0 || m[0] >= w || m[1] >= h || cut.has(key(...m)) || (m[0] === gx && m[1] === gy) || (g[y][x] & d2)) continue;
+          g[y][x] |= d2; g[m[1]][m[0]] |= OPP[d2]; joined = true; break; }
+        if (joined) break; }
+    }
+  }
   const { par } = bfs([0, 0]); const path = [goal]; while (key(...path[0]) !== '0,0') path.unshift(par.get(key(...path[0])));
   const onPath = new Set(path.map(c => key(...c))), dead = [];
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const n = [N_, E_, S_, W_].filter(d => g[y][x] & d).length; if (n === 1 && !(x === 0 && y === 0) && !(x === goal[0] && y === goal[1])) dead.push([x, y]); }
