@@ -11424,6 +11424,7 @@ Object.assign(MR_PIECES, {
 });
 // levels: the marble always drops from the same spot, the cup is fixed, and stones, planks and pillars are in the way.
 // Every level was checked by building a run that solves it and dropping marbles through it; 9 to 12 were also checked to need more than two pieces.
+// The piece counts noted on 13 to 22 are for the run that was found; a clever builder may need fewer.
 const MR_LEVELS = [
   { drop: 1.2, cup: 5, rocks: [] },
   { drop: 5.8, cup: 0, rocks: [['pillar3', 3, 0]] },
@@ -11438,6 +11439,18 @@ const MR_LEVELS = [
   { drop: 0.6, cup: 3, rocks: [['plank3', 0, 7], ['plank3', 3, 7], ['plank3', 1, 4], ['plank3', 4, 4]] },
   { drop: 6.4, cup: 0, rocks: [['plank3', 1, 7], ['plank3', 4, 7], ['plank3', 0, 4], ['plank3', 3, 4], ['stone', 2, 0]] },
   { drop: 6.4, cup: 3, rocks: [['plank3', 1, 8], ['plank3', 4, 8], ['plank3', 0, 5], ['plank2', 3, 5], ['stone', 5, 5], ['plank3', 1, 2], ['plank3', 4, 2]] },
+  // 13 to 22: shelves with one gap each that make the marble zig-zag down, stones in the corridors, cups away from the last gap.
+  // Each was solved by a search over the game's own physics, then that run was polished until the marbles land reliably (10 to 16 out of 16).
+  { drop: 6.4, cup: 5, rocks: [['plank3', 4, 8], ['plank3', 1, 8], ['plank3', 0, 6], ['plank3', 3, 6], ['pillar3', 4, 0], ['plank2', 5, 4]] },   // 13: solved with 4 pieces
+  { drop: 0.6, cup: 4, rocks: [['plank3', 0, 8], ['plank3', 3, 8], ['plank3', 1, 5], ['plank3', 4, 5], ['plank3', 0, 2], ['plank3', 3, 2], ['stone', 3, 6]] },   // 14: solved with 4 pieces
+  { drop: 3.5, cup: 5, rocks: [['plank3', 1, 8], ['plank3', 4, 8], ['plank3', 0, 6], ['plank3', 3, 6], ['plank3', 0, 4], ['plank3', 4, 4], ['plank3', 1, 2], ['plank3', 4, 2], ['stone', 5, 5], ['stone', 1, 3]] },   // 15: solved with 4 pieces
+  { drop: 0.6, cup: 3, rocks: [['plank3', 0, 8], ['plank3', 3, 8], ['plank3', 1, 6], ['plank3', 4, 6], ['plank3', 0, 4], ['plank3', 3, 4], ['plank3', 1, 2], ['plank3', 4, 2]] },   // 16: solved with 6 pieces
+  { drop: 6.4, cup: 4, rocks: [['plank3', 1, 8], ['plank3', 4, 8], ['plank3', 0, 6], ['plank3', 3, 6], ['plank3', 1, 4], ['plank3', 4, 4], ['plank3', 0, 2], ['plank3', 3, 2], ['stone', 3, 7], ['stone', 3, 3]] },   // 17: solved with 7 pieces
+  { drop: 6.4, cup: 3, rocks: [['plank3', 0, 8], ['plank3', 3, 8], ['plank3', 1, 6], ['plank3', 4, 6], ['plank3', 0, 4], ['plank3', 3, 4], ['plank3', 1, 2], ['plank3', 4, 2], ['stone', 3, 9], ['stone', 2, 7], ['stone', 4, 5], ['stone', 2, 3], ['stone', 5, 1], ['stone', 1, 1]] },   // 18: solved with 6 pieces
+  { drop: 0.6, cup: 5, rocks: [['plank3', 0, 8], ['plank3', 3, 8], ['plank3', 1, 6], ['plank3', 4, 6], ['plank3', 0, 4], ['plank3', 3, 4], ['plank3', 1, 2], ['plank3', 4, 2], ['stone', 0, 0]] },   // 19: solved with 6 pieces
+  { drop: 0.6, cup: 0, rocks: [['plank3', 0, 8], ['plank3', 3, 8], ['plank3', 1, 5], ['plank3', 4, 5], ['plank3', 0, 2], ['plank3', 3, 2]] },   // 20: solved with 8 pieces
+  { drop: 6.4, cup: 0, rocks: [['plank3', 1, 8], ['plank3', 4, 8], ['plank3', 0, 6], ['plank3', 3, 6], ['plank3', 1, 4], ['plank3', 4, 4], ['plank3', 0, 2], ['plank3', 3, 2], ['stone', 3, 7], ['stone', 2, 5], ['stone', 4, 3], ['stone', 6, 0], ['stone', 1, 9]] },   // 21: solved with 8 pieces
+  { drop: 0.6, cup: 5, rocks: [['plank3', 0, 8], ['plank3', 3, 8], ['plank3', 1, 6], ['plank3', 4, 6], ['plank3', 0, 4], ['plank3', 3, 4], ['plank3', 1, 2], ['plank3', 4, 2], ['stone', 3, 7], ['stone', 4, 5], ['stone', 2, 3], ['stone', 0, 0], ['stone', 5, 9]] },   // 22: solved with 9 pieces
 ];
 const MR_GOAL = { build: 10, levels: 5 };   // marbles in the cup for a star
 const MR_TRAY = ['ramp', 'long', 'turn', 'funnel', 'bumper', 'tramp', 'bell', 'spinner'];
