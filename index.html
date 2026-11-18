@@ -44,6 +44,7 @@ body { padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: max(12p
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { height: 100%; height: var(--app-h, 100%); overscroll-behavior: none; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }   /* iPhone Safari must not enlarge text by itself (it does when the phone turns sideways) */
 html, body, #app { touch-action: manipulation; }
 *, *::before, *::after { touch-action: manipulation; }   /* every element: no double-tap zoom anywhere (rules that set touch-action: none still win) */
 body {
@@ -1876,12 +1877,15 @@ button:focus-visible, [tabindex]:focus-visible, label:focus-visible { outline: 3
 // if the page is left zoomed in once the fingers lift, re-apply the page's size so it springs back to normal
 {
   const vp = document.querySelector('meta[name="viewport"]'), base = vp && vp.content; let fingers = 0, t = 0;
-  const unzoom = () => { if (!vp || !window.visualViewport || fingers || visualViewport.scale <= 1.02) return; vp.content = base.replace('initial-scale=1', 'initial-scale=1.0001'); setTimeout(() => { vp.content = base; window.scrollTo(0, 0); }, 60); };
+  // lifting the 'no zoom' rule for a moment and putting it back makes Safari snap back to normal size
+  const unzoom = () => { if (!vp || !window.visualViewport || fingers || visualViewport.scale <= 1.02) return; vp.content = 'width=device-width, initial-scale=1, viewport-fit=cover'; setTimeout(() => { vp.content = base; window.scrollTo(0, 0); }, 60); };
   const later = () => { clearTimeout(t); t = setTimeout(unzoom, 350); };
   document.addEventListener('touchstart', e => { fingers = e.touches.length; }, { passive: true });
   document.addEventListener('touchend', e => { fingers = e.touches.length; if (!fingers) later(); }, { passive: true });
   document.addEventListener('touchcancel', () => { fingers = 0; later(); }, { passive: true });
   if (window.visualViewport) visualViewport.addEventListener('resize', later);
+  addEventListener('orientationchange', () => [300, 800].forEach(ms => setTimeout(unzoom, ms)));
+  addEventListener('pageshow', later);
 }
 document.addEventListener('touchmove', e => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
 
@@ -1914,9 +1918,22 @@ const PIP_ART = `
 // Keep the app exactly as tall as the visible screen. Phones change that when turned sideways or when the browser's
 // bars show or hide, and iPhones report the new size a moment after turning, so check again shortly after.
 (function fitHeight() {
-  const set = () => document.documentElement.style.setProperty('--app-h', Math.round(window.innerHeight) + 'px');
-  set(); addEventListener('resize', set);
-  addEventListener('orientationchange', () => { set(); [150, 400, 900].forEach(ms => setTimeout(set, ms)); });
+  // Two readings, and the smaller one wins (an iPhone coming back from the lock screen or the background can briefly
+  // report a height that's too tall, which pushed the bottom of the screen off the phone). Never taller than the screen
+  // itself. Pinch-zoom can't change it (the plain window height shrinks while zoomed in).
+  const vv = window.visualViewport, root = document.documentElement;
+  const measure = () => {
+    let h = vv ? vv.height * vv.scale : window.innerHeight;
+    if (root.clientHeight > 100) h = Math.min(h, root.clientHeight);
+    if (screen && screen.width && screen.height) { const tall = Math.max(screen.width, screen.height), short = Math.min(screen.width, screen.height); h = Math.min(h, matchMedia('(orientation: portrait)').matches ? tall : short); }
+    return Math.round(h);
+  };
+  const set = () => { const h = measure(), now = parseFloat(root.style.getPropertyValue('--app-h')) || 0; if (h > 100 && Math.abs(h - now) > 1) root.style.setProperty('--app-h', h + 'px'); };   // compares with what the page is actually using
+  const soon = () => { set(); [150, 400, 900, 1600].forEach(ms => setTimeout(set, ms)); };   // iPhones report the new size a moment late
+  set(); addEventListener('resize', set); if (vv) vv.addEventListener('resize', set);
+  addEventListener('orientationchange', soon); addEventListener('pageshow', soon); addEventListener('focus', soon);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) soon(); });
+  setInterval(() => { if (!document.hidden) set(); }, 1500);   // and a quiet check now and then, so a wrong height can't stick
 })();
 (function () {
 'use strict';
